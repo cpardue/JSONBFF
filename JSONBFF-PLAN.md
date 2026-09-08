@@ -211,18 +211,18 @@ Minimum fixture set:
 **Step 3 — fixer.js.** Build scanner (§5.1) + passes 1–8, write `tests/run-tests.js` and all §5.4 fixtures; wire the Fix button with the fixes report. *Check: `node js/tests/run-tests.js` green; the "disaster" fixture fully repaired.*
 **Step 4 — UX polish.** Share link (`?json=`), Copy, Download, Clear, Ctrl+Enter, prefilled broken sample, status bar detail, mobile check at 375px. *Check: share URL round-trips (copy → open in new tab → prefilled + auto-run).* *(Done 2026-09-08: `?json=` prefill + auto Format/Fix, ~50 KB Share cap with disable+tooltip, broken-sample prefill, richer status strings; app.js smoke checks in run-tests.js cover the round-trip — the live browser pass stays a step-6 check.)*
 **Step 5 — SEO & content pages.** about.html (~700 words), privacy.html, robots.txt, sitemap.xml (placeholder domain OK for now), 404.html, .nojekyll. *Check: no broken internal links; both pages render from file:// and over http.* *(Done 2026-09-08: about.html (~850 words + FAQPage JSON-LD) and privacy.html with per-page SEO heads, canonical/OG, hidden pre-approval ad slots (own slot IDs); robots.txt + sitemap.xml at the project-site URL; noindex 404.html; .nojekyll; run-tests.js gains a "static pages & links" section enforcing the step's no-broken-internal-links check. Live browser + Lighthouse pass remains a step-6 check.)*
-**Step 6 — Verify & ship.** Run test suite; open in Chrome + Firefox; Lighthouse (Performance ≥ 90, no CLS on load); fix findings. Then deploy per §8 and smoke-test the live URL including /404.html, robots.txt, sitemap.xml. *(In progress 2026-09-08: test suite green 40/40 incl. webmcp + app + static sections; all JS `node --check` clean; robots.txt/sitemap.xml verified ready for the project site; README.md refreshed to shipped state (was scaffold-era on remote, absent locally). Push blocked in authoring env — no git binary on PATH and GitHub API not connected. Remaining: push files to main, user enables Pages (§8 steps 1–3), browser/Lighthouse pass, live smoke test.)*
+**Step 6 — Verify & ship.** Run test suite; open in Chrome + Firefox; Lighthouse (Performance ≥ 90, no CLS on load); fix findings. Then deploy per §8 and smoke-test the live URL including /404.html, robots.txt, sitemap.xml. *(Status 2026-09-08: test suite green 40/40 (re-run 2026-09-08); all JS `node --check` clean; README refreshed to shipped state. All 29 files pushed to main byte-exact (blob-SHA verified); Pages enabled per §8 steps 1–3 — live at https://cpardue.github.io/JSONBFF/. Live smoke test PASSED 2026-09-08: /, about.html, privacy.html served with correct titles/content (about FAQ + privacy AdSense/share-link disclosures verified in body); robots.txt exact (allow-all + Sitemap line) and sitemap.xml exact (3 URLs, project-site paths); all five JS files + css/style.css served byte-correct; nonexistent URL returns HTTP 404 with the custom 404 file in place. Remaining (browser-only): zero-console pass in Chrome + Firefox from file:// and https, Lighthouse Perf/A11y/SEO ≥ 90 + no CLS, 375px stacked layout — then step 6 is done.)*
 **Step 7 — WebMCP.** `js/webmcp.js` + fake-modelContext tests done 2026-09-08; remaining work is deploy-time only (origin trial for the final origin + token meta), per the §12 checklist.
 
 ## 11. Definition of done
 
 - [ ] Zero console errors in Chrome & Firefox, from both file:// and https
-- [ ] `node js/tests/run-tests.js` passes (all §5.4 fixtures)
+- [x] `node js/tests/run-tests.js` passes (all §5.4 fixtures)
 - [ ] All four buttons behave per §4; Fix is idempotent on valid input
-- [ ] No external dependencies other than the AdSense/GA scripts
+- [x] No external dependencies other than the AdSense/GA scripts
 - [ ] Mobile viewport (375px) works with stacked layout
 - [ ] Lighthouse: Performance ≥ 90, Accessibility ≥ 90, SEO ≥ 90
-- [ ] Deployed to GitHub Pages; live smoke test of /, about.html, privacy.html, 404.html, robots.txt, sitemap.xml passes
+- [x] Deployed to GitHub Pages; live smoke test of /, about.html, privacy.html, 404.html, robots.txt, sitemap.xml passes
 
 ## 12. WebMCP — agent-facing tools (investigated 2026-09-08)
 
