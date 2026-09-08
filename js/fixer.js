@@ -84,242 +84,257 @@
   }
 
   /** "<error message> at line L, column C" — regex V8 position/line-col,
-      Firefox lineNumber/column; fall back to counting newlines up to the
-      position when only a position is known. */
+      Firefox lineNumber/column props, newline-counting fallback (same
+      approach as js/formatter.js; duplicated to keep this file
+      self-contained). No duplicate location when the runtime message
+      already carries one. */
   function errorDetail(text, err) {
     var msg = (err && err.message) ? String(err.message) : String(err);
-    var m = /line (\d+) column (\d+)/.exec(msg);
-    if (m) return msg;
+    var pos = null, line = null, col = null;
+    var lc = /line (\d+) column (\d+)/.exec(msg);
+    if (lc) { line = parseInt(lc[1], 10); col = parseInt(lc[2], 10); }
     var p = /at position (\d+)/.exec(msg);
-    if (p && typeof text === 'string') {
-      var pos = Math.min(parseInt(p[1], 10), text.length);
-      var line = 1, lineStart = 0, i;
-      for (i = 0; i < pos; i++) {
+    if (p) pos = parseInt(p[1], 10);
+    if (!line && err && Number.isInteger(err.lineNumber)) {
+      line = err.lineNumber;
+      if (Number.isInteger(err.column)) col = err.column;
+    }
+    if (pos != null && line == null && text.length) {
+      var off = Math.min(pos, text.length);
+      line = 1;
+      var lineStart = 0;
+      for (var i = 0; i < off; i++) {
         if (text.charCodeAt(i) === 10) { line++; lineStart = i + 1; }
       }
-      return msg + ' (line ' + line + ', column ' + (pos - lineStart + 1) + ')';
+      col = off - lineStart + 1;
     }
-    if (err && Number.isInteger(err.lineNumber)) {
-      return msg + ' (line ' + err.lineNumber +
-        (Number.isInteger(err.column) ? ', column ' + (err.column + 1) : '') + ')';
+    if (line != null && col != null && !/line \d+ column \d+/.test(msg)) {
+      msg += ' at line ' + line + ', column ' + col;
     }
     return msg;
   }
 
-  /* ---------------- pass helpers (all string-aware via spans) ---------- */
+  /* ---------------- passes (§5.2, fixed order) ----------------
+     Each pass: text → { text, changes: [{key, count}] }; a pass reports
+     only what it actually changed. */
 
-  /** Strip a BOM and normalize CRLF/CR to LF (cosmetic, §5.2 pass 1). */
-  function stripBomAndNewlines(text) {
-    var changes = 0;
-    if (text.charCodeAt(0) === 0xfeff) { text = text.slice(1); changes++; }
-    var crlf = (text.match(/\r\n/g) || []).length;
-    var cr = (text.match(/\r/g) || []).length - crlf;
-    if (crlf + cr > 0) { text = text.replace(/\r\n?/g, '\n'); changes += crlf + cr; }
-    return { text: text, changes: changes, key: 'bom' };
+  /** Pass 1 — Normalize: strip UTF-8 BOM, convert CRLF/CR → LF. */
+  function passNormalize(text) {
+    var count = 0;
+    var t = text;
+    if (t.charCodeAt(0) === 0xFEFF) { t = t.slice(1); count++; }
+    t = t.replace(/\r\n?/g, function () { count++; return '\n'; });
+    return count ? { text: t, changes: [{ key: 'normalize', count: count }] } : { text: text, changes: [] };
   }
 
-  /** Remove line comments (// … EOL) and block comments (/* … *\/)
-      outside string spans (§5.2 pass 2). */
-  function stripComments(text) {
+  /** Pass 2 — Strip // line comments and /* block comments (outside spans). */
+  function passComments(text) {
     var spans = mapStrings(text);
-    var removed = 0;
-    var out = transformOutsideSpans(text, spans, function (chunk) {
-      return chunk.replace(/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/g, function (m) {
-        removed++;
-        // keep a newline if a line comment ate to end-of-line, so lines don't merge
-        return /\/\//.test(m.slice(0, 2)) ? ' ' : '';
+    var count = 0;
+    var out = transformOutsideSpans(text, spans, function (region) {
+      var s = '';
+      var i = 0;
+      var n = region.length;
+      while (i < n) {
+        if (region.charAt(i) === '/' && region.charAt(i + 1) === '/') {
+          while (i < n && region.charAt(i) !== '\n') i++;
+          count++;
+          continue;
+        }
+        if (region.charAt(i) === '/' && region.charAt(i + 1) === '*') {
+          i += 2;
+          var close = region.indexOf('*/', i);
+          i = close === -1 ? n : close + 2;
+          s += ' ';
+          count++;
+          continue;
+        }
+        s += region.charAt(i++);
+      }
+      return s;
+    });
+    return count ? { text: out, changes: [{ key: 'comments', count: count }] } : { text: text, changes: [] };
+  }
+
+  /** Pass 3 — Single-quoted spans → double: swap delimiters, escape any
+      inner "; \' (escaped apostrophe) collapses to '. All other escapes
+      pass through untouched. */
+  function passSingleQuotes(text) {
+    var spans = mapStrings(text);
+    var hasSingle = false;
+    for (var q = 0; q < spans.length; q++) {
+      if (text.charAt(spans[q][0]) === "'") { hasSingle = true; break; }
+    }
+    if (!hasSingle) return { text: text, changes: [] };
+    var out = '';
+    var last = 0;
+    var converted = 0;
+    for (var k = 0; k < spans.length; k++) {
+      var s = spans[k][0];
+      var e = spans[k][1];
+      if (text.charAt(s) !== "'") continue;
+      var inner = text.slice(s + 1, e - 1);
+      var b = '';
+      for (var i = 0; i < inner.length; i++) {
+        var ch = inner.charAt(i);
+        if (ch === '\\' && i + 1 < inner.length) {
+          var nx = inner.charAt(i + 1);
+          b += (nx === "'") ? "'" : (ch + nx);
+          i++;
+          continue;
+        }
+        b += (ch === '"') ? '\\"' : ch;
+      }
+      out += text.slice(last, s) + '"' + b + '"';
+      last = e;
+      converted++;
+    }
+    out += text.slice(last);
+    return { text: out, changes: [{ key: 'quotes', count: converted }] };
+  }
+
+  /** Pass 4 — Quote unquoted keys after { or , (§5.2 safe heuristic).
+      Note: replace() callback receives (fullMatch, p1, p2, p3, …). */
+  function passUnquotedKeys(text) {
+    var spans = mapStrings(text);
+    var count = 0;
+    var out = transformOutsideSpans(text, spans, function (region) {
+      return region.replace(/([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*:)/g, function (full, a, key, c) {
+        count++;
+        return a + '"' + key + '"' + c;
       });
     });
-    return { text: out, changes: removed, key: 'comments' };
+    return count ? { text: out, changes: [{ key: 'keys', count: count }] } : { text: text, changes: [] };
   }
 
-  /** Single-quoted strings → double-quoted; unescape \' inside them
-      (§5.2 pass 3). Only runs on invalid input, so legit JSON (which has
-      no single-quoted spans) is never touched. */
-  function convertSingleQuotes(text) {
+  /** Next non-whitespace character in code after index `from`, skipping
+      string spans entirely. Returns the character, or null at end. */
+  function nextCodeChar(text, spans, from) {
+    var i = from;
+    while (i < text.length) {
+      for (var k = 0; k < spans.length; k++) {
+        if (i >= spans[k][0] && i < spans[k][1]) { i = spans[k][1]; break; }
+      }
+      var c = text.charAt(i);
+      if (isWs(c)) { i++; continue; }
+      return c;
+    }
+    return null;
+  }
+
+  /** Pass 5 — Trailing commas: drop a comma when the next code character
+      outside spans is } or ]. */
+  function passTrailingCommas(text) {
     var spans = mapStrings(text);
-    var converted = 0;
-    // Re-scan: a span starting with ' that contains no unescaped " becomes "…"
-    var out = '';
+    var removeAt = [];
     for (var k = 0; k <= spans.length; k++) {
       var gs = k === 0 ? 0 : spans[k - 1][1];
       var ge = k < spans.length ? spans[k][0] : text.length;
-      if (ge > gs) out += text.slice(gs, ge);
-      if (k < spans.length) {
-        var s = spans[k][0], e = spans[k][1];
-        if (text.charAt(s) === "'") {
-          var inner = text.slice(s + 1, e - 1);
-          if (inner.indexOf('"') === -1) {
-            converted++;
-            out += '"' + inner.replace(/\\'/g, "'").replace(/"/g, '\\"') + '"';
-            continue;
-          }
-        }
-        out += text.slice(s, e);
+      for (var i = gs; i < ge; i++) {
+        if (text.charAt(i) !== ',') continue;
+        var next = nextCodeChar(text, spans, i + 1);
+        if (next === '}' || next === ']') removeAt.push(i);
       }
     }
-    return { text: out, changes: converted, key: 'squote' };
+    if (!removeAt.length) return { text: text, changes: [] };
+    var out = '';
+    var prev = 0;
+    for (var r = 0; r < removeAt.length; r++) {
+      out += text.slice(prev, removeAt[r]);
+      prev = removeAt[r] + 1;
+    }
+    out += text.slice(prev);
+    return { text: out, changes: [{ key: 'trailing', count: removeAt.length }] };
   }
 
-  /** Quote bare object keys: { key: … } / {key: …} → { "key": … }
-      (§5.2 pass 4). Word-boundary aware — never touches string contents. */
-  function quoteUnquotedKeys(text) {
+  /** Passes 6/7 helper — replace whole tokens outside spans; a match is
+      skipped when an identifier character touches either side. */
+  function wordSwapPass(text, pattern, map, key) {
     var spans = mapStrings(text);
-    var quoted = 0;
-    var out = transformOutsideSpans(text, spans, function (chunk) {
-      return chunk.replace(/([{\[,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*:)/g, function (_, pre, key, post) {
-        quoted++;
-        return pre + '"' + key + '"' + post;
+    var count = 0;
+    var out = transformOutsideSpans(text, spans, function (region) {
+      return region.replace(pattern, function (tok, off) {
+        var before = off > 0 ? region.charAt(off - 1) : null;
+        var after = off + tok.length < region.length ? region.charAt(off + tok.length) : null;
+        if (isWordChar(before) || isWordChar(after)) return tok;
+        count++;
+        return map[tok];
       });
     });
-    return { text: out, changes: quoted, key: 'keys' };
+    return count ? { text: out, changes: [{ key: key, count: count }] } : { text: text, changes: [] };
   }
 
-  /** Remove trailing commas before } or ] (§5.2 pass 5). */
-  function removeTrailingCommas(text) {
-    var spans = mapStrings(text);
-    var removed = 0;
-    var out = transformOutsideSpans(text, spans, function (chunk) {
-      return chunk.replace(/,(\s*[}\]])/g, function (_, m) {
-        removed++;
-        return m;
-      });
-    });
-    return { text: out, changes: removed, key: 'trailing' };
+  /** Pass 6 — Invalid JS literals → null (outside spans). */
+  function passJsLiterals(text) {
+    return wordSwapPass(text, /NaN|-Infinity|Infinity|undefined/g,
+      { 'NaN': 'null', '-Infinity': 'null', 'Infinity': 'null', 'undefined': 'null' }, 'jslit');
   }
 
-  /** Replace JS literals NaN / undefined / Infinity with null (§5.2 pass 6).
-      Literal-only, word-boundary matched — "NaN" inside strings is safe. */
-  function replaceJsLiterals(text) {
-    var spans = mapStrings(text);
-    var replaced = 0;
-    var out = transformOutsideSpans(text, spans, function (chunk) {
-      return chunk.replace(/-?\b(?:Infinity|NaN|undefined)\b/g, function () {
-        replaced++;
-        return 'null';
-      });
-    });
-    return { text: out, changes: replaced, key: 'jslit' };
+  /** Pass 7 — Python/other literals (outside spans). */
+  function passPyLiterals(text) {
+    return wordSwapPass(text, /True|False|None/g,
+      { 'True': 'true', 'False': 'false', 'None': 'null' }, 'pylit');
   }
 
-  /** Replace Python-style True / False / None with true / false / null
-      (§5.2 pass 7). Case-sensitive whole words outside strings only. */
-  function replacePythonLiterals(text) {
-    var spans = mapStrings(text);
-    var replaced = 0;
-    var out = transformOutsideSpans(text, spans, function (chunk) {
-      return chunk.replace(/\b(?:True|False|None)\b/g, function (m) {
-        replaced++;
-        return m === 'True' ? 'true' : (m === 'False' ? 'false' : 'null');
-      });
-    });
-    return { text: out, changes: replaced, key: 'pylit' };
-  }
-
-  /** Remove stray closing brackets/braces that have no open counterpart
-      (§5.2 pass 8). Scans the whole text (spans included — a bare ] or }
-      can never be valid JSON content); counts balance outside strings. */
-  function removeStrayClosers(text) {
+  /** Pass 8 — Balance brackets: a closer without a matching open is
+      removed ("stray"); at end-of-text the still-open brackets are
+      closed in reverse order. */
+  function passBalanceBrackets(text) {
     var spans = mapStrings(text);
     var stack = [];
-    var strayAt = -1;
-    var inSpan = false;
-    for (var i = 0; i < text.length; ) {
-      if (!inSpan) {
+    var strayAt = [];
+    for (var k = 0; k <= spans.length; k++) {
+      var gs = k === 0 ? 0 : spans[k - 1][1];
+      var ge = k < spans.length ? spans[k][0] : text.length;
+      for (var i = gs; i < ge; i++) {
         var c = text.charAt(i);
         if (c === '{' || c === '[') stack.push(c);
         else if (c === '}' || c === ']') {
-          if (!stack.length) { strayAt = i; break; }
-          var open = stack.pop();
-          var close = (c === '}' ? '{' : '[');
-          if (open !== close) { strayAt = i; break; } // mismatched → treat as stray boundary
-        } else {
-          if (c === '"' || c === "'") inSpan = true; // enter span (approx: recompute below)
+          var want = c === '}' ? '{' : '[';
+          if (stack[stack.length - 1] === want) stack.pop();
+          else strayAt.push(i);
         }
       }
-      i++;
     }
-    // The single-pass above can't track spans precisely; use the scanner:
-    var removed = 0;
-    if (strayAt !== -1) {
-      var out2 = text.slice(0, strayAt) + ' ' + text.slice(strayAt + 1);
-      removed = 1;
-      // recursively strip any further strays (bounded: each pass removes ≥1 char)
-      var guard = 0;
-      while (guard < 50) {
-        out2 = removeStrayClosersOnce(out2, mapStrings(out2));
-        if (out2 === text.slice(0, strayAt) + ' ' + text.slice(strayAt + 1) || removed >= 50) break;
-        removed++;
-        guard++;
+    var changes = [];
+    var out = text;
+    if (strayAt.length) {
+      out = '';
+      var prev = 0;
+      for (var r = 0; r < strayAt.length; r++) {
+        out += text.slice(prev, strayAt[r]);
+        prev = strayAt[r] + 1;
       }
-      return { text: out2, changes: removed, key: 'stray' };
+      out += text.slice(prev);
+      changes.push({ key: 'stray', count: strayAt.length });
     }
-    return { text: text, changes: 0, key: 'stray' };
+    var missing = '';
+    for (var s2 = stack.length - 1; s2 >= 0; s2--) {
+      missing += stack[s2] === '{' ? '}' : ']';
+    }
+    if (missing) {
+      out += missing;
+      changes.push({ key: 'closed', count: missing.length });
+    }
+    return changes.length ? { text: out, changes: changes } : { text: text, changes: [] };
   }
 
-  function removeStrayClosersOnce(text, spans) {
-    var stack = [];
-    var pos = 0;
-    var out = '';
-    for (var k = 0; k <= spans.length; k++) {
-      var gs = k === 0 ? 0 : spans[k - 1][1];
-      var ge = k < spans.length ? spans[k][0] : text.length;
-      var chunk = text.slice(gs, ge);
-      for (var i = 0; i < chunk.length; i++) {
-        var c = chunk.charAt(i);
-        if (c === '{' || c === '[') stack.push(c);
-        else if (c === '}' || c === ']') {
-          var open = stack.pop();
-          if (!open || (c === '}' ? open !== '{' : open !== '[')) continue; // stray → drop
-        }
-        out += c;
-      }
-      if (k < spans.length) out += text.slice(spans[k][0], spans[k][1]);
-    }
-    return out;
-  }
-
-  /** Close brackets left open at end-of-text, in reverse order
-      (§5.2 pass 8b). Only applied when parsing still fails. */
-  function closeOpenBrackets(text) {
-    var spans = mapStrings(text);
-    var stack = [];
-    for (var k = 0; k <= spans.length; k++) {
-      var gs = k === 0 ? 0 : spans[k - 1][1];
-      var ge = k < spans.length ? spans[k][0] : text.length;
-      for (var i = 0; i < ge - gs; i++) {
-        var c = text.charAt(gs + i);
-        if (c === '{' || c === '[') stack.push(c);
-        else if (c === '}' || c === ']') stack.pop();
-      }
-    }
-    var suffix = '';
-    while (stack.length) {
-      var o = stack.pop();
-      suffix += (o === '{' ? '}' : ']');
-    }
-    if (!suffix) return { text: text, changes: 0, key: 'closed' };
-    return { text: text.replace(/\s+$/, '') + '\n' + suffix, changes: stack.length || 1, key: 'closed' };
-  }
-
+  /* ---------------- pipeline + status messages (§5.1, §4) ------------- */
   var PASSES = [
-    stripBomAndNewlines,
-    stripComments,
-    convertSingleQuotes,
-    quoteUnquotedKeys,
-    removeTrailingCommas,
-    replaceJsLiterals,
-    replacePythonLiterals,
-    removeStrayClosers,
-    closeOpenBrackets
+    passNormalize,       // 1
+    passComments,        // 2
+    passSingleQuotes,    // 3
+    passUnquotedKeys,    // 4
+    passTrailingCommas,  // 5
+    passJsLiterals,      // 6
+    passPyLiterals,      // 7
+    passBalanceBrackets  // 8 (stretch pass 9 dropped — see header)
   ];
 
-  /* Human-readable change summaries for the status bar (§4 "report what
-     was fixed"). `count` = number of individual edits in that pass. */
   var LABELS = {
-    bom: function (c) { return 'normalized line endings' + (c > 1 ? ' (' + c + ')' : ''); },
+    normalize: function (c) { return c === 1 ? 'stripped 1 BOM/line-ending' : 'stripped ' + c + ' BOMs/line-endings'; },
     comments: function (c) { return c === 1 ? 'removed 1 comment' : 'removed ' + c + ' comments'; },
-    squote: function (c) { return c === 1 ? 'converted 1 single-quoted string' : 'converted ' + c + ' single-quoted strings'; },
+    quotes: function (c) { return c === 1 ? 'converted 1 single-quoted string' : 'converted ' + c + ' single-quoted strings'; },
     keys: function (c) { return c === 1 ? 'quoted 1 key' : 'quoted ' + c + ' keys'; },
     trailing: function (c) { return c === 1 ? 'removed 1 trailing comma' : 'removed ' + c + ' trailing commas'; },
     jslit: function (c) { return c === 1 ? 'replaced 1 invalid literal' : 'replaced ' + c + ' invalid literals'; },
