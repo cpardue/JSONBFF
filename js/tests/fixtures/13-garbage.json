@@ -1,0 +1,5 @@
+{
+  "name": "non-JSON garbage (clean failure report, no crash)",
+  "input": "hello world this is not json",
+  "expectOk": false
+}
