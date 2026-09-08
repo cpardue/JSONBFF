@@ -1,0 +1,10 @@
+{
+  "name": "single quotes (doubles nested inside, apostrophes in doubles)",
+  "input": "{ 'name': 'it\\'s a test', 'quote': 'she said \"hello\"', 'mix': \"double's fine\", 'count': 2 }",
+  "expected": {
+    "name": "it's a test",
+    "quote": "she said \"hello\"",
+    "mix": "double's fine",
+    "count": 2
+  }
+}
