@@ -89,22 +89,16 @@
     input.value = '';
     output.textContent = '';
     setStatus('info', DEFAULT_STATUS);
-    refreshShareState();
+    input.focus();
   }
 
-  /* ---------------- clipboard + download (steps 1 & 4) ------------ */
-  var SHARE_MAX_CHARS = 50000; // §4: keep share links practical (~50 KB cap)
-
-  function groupNum(n) { return n.toLocaleString('en-US'); }
-
-  /** execCommand fallback for file:// and other non-secure contexts,
-      where navigator.clipboard may be undefined (step 4). */
+  /* ---------------- output actions ---------------- */
   function legacyCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', '');
-    ta.style.position = 'absolute';
-    ta.style.left = '-9999px';
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
     document.body.appendChild(ta);
     ta.select();
     var ok = false;
@@ -113,28 +107,23 @@
     return ok;
   }
 
-  function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text);
-    }
-    return new Promise(function (resolve, reject) {
-      if (legacyCopy(text)) resolve(); else reject(new Error('no clipboard API'));
-    });
-  }
-
   function doCopy() {
     var text = output.textContent;
-    if (!text) { setStatus('warn', 'Nothing to copy yet — run Validate, Format or Fix first.'); return; }
-    copyText(text).then(function () {
-      setStatus('ok', 'Copied to clipboard (' + groupNum(byteSize(text)) + ' bytes).');
-    }, function () {
-      setStatus('error', 'Copy failed in this browser — select the output pane and use Ctrl/Cmd+C.');
-    });
+    if (!text) { setStatus('warn', 'Nothing to copy yet — run Format, Fix or Compact first.'); return; }
+    var done = function () { setStatus('ok', 'Copied ' + byteSize(text) + ' bytes to the clipboard.'); };
+    var failed = function () { setStatus('error', 'Copy failed — select the output text and press Ctrl+C.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {
+        if (legacyCopy(text)) done(); else failed();
+      });
+    } else {
+      if (legacyCopy(text)) done(); else failed();
+    }
   }
 
   function doDownload() {
     var text = output.textContent;
-    if (!text) { setStatus('warn', 'Nothing to download yet — run Validate, Format or Fix first.'); return; }
+    if (!text) { setStatus('warn', 'Nothing to download yet — run Format, Fix or Compact first.'); return; }
     try {
       var blob = new Blob([text], { type: 'application/json' });
       var url = URL.createObjectURL(blob);
@@ -145,47 +134,55 @@
       a.click();
       a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      setStatus('ok', 'Downloaded json-formatted.json (' + groupNum(byteSize(text)) + ' bytes).');
+      setStatus('ok', 'Downloaded json-formatted.json (' + byteSize(text) + ' bytes).');
     } catch (e) {
       setStatus('error', 'Download failed: ' + e.message);
     }
   }
 
-  /* ---------------- share (step 4) ----------------
-     The URL IS the transport: ?json=<percent-encoded text>. Base = href
-     minus any query/hash, so it works from file:// without URL parsing. */
-  function buildShareUrl(text) {
-    return window.location.href.split(/[?#]/)[0] + '?json=' + encodeURIComponent(text);
-  }
+  /* ---------------- share link (step 4: §4 global behaviors) ------------
+     Share copies `?json=<URL-encoded input>`; on load, that param prefills
+     the input and auto-runs Format (Fix if it fails). ~50 KB cap: above it
+     the button disables with a tooltip saying why. Only URLs are capped —
+     pasting/copying/downloading big JSON stays unlimited. */
+  var SHARE_MAX_CHARS = 50000;
+
+  function groupNum(n) { return n.toLocaleString('en-US'); }
 
   function parseSharedJson() {
     try {
-      var shared = new URLSearchParams(window.location.search).get('json');
-      if (shared == null) return null;
-      return decodeURIComponent(shared);
-    } catch (e) {
-      return null; // malformed ?json= → treat as absent, don't crash startup
-    }
+      if (typeof URLSearchParams !== 'function' || !window.location) return null;
+      var v = new URLSearchParams(window.location.search).get('json');
+      return (typeof v === 'string' && v.length) ? v : null;
+    } catch (e) { return null; }
+  }
+
+  function buildShareUrl(text) {
+    // Current page minus any existing query/hash, plus ?json= — works from
+    // file:// and https without relying on URL-parsing edge cases.
+    var base = String(window.location.href).split(/[?#]/)[0];
+    return base + '?json=' + encodeURIComponent(text);
   }
 
   function doShare() {
-    var t = input.value;
-    if (!t.trim()) { setStatus('warn', 'Paste some JSON first — Share copies a link that opens this page with it prefilled.'); return; }
-    if (t.length > SHARE_MAX_CHARS) {
-      setStatus('error', 'Too big for a share link: ' + groupNum(t.length) + ' chars (limit ' + groupNum(SHARE_MAX_CHARS) + '). Copy or download the JSON instead.');
-      return;
+    var text = input.value;
+    if (!text.trim()) { setStatus('warn', 'Nothing to share yet — paste JSON first.'); return; }
+    if (text.length > SHARE_MAX_CHARS) {
+      setStatus('warn', 'Input is ' + groupNum(text.length) + ' chars — over the ~50 KB share-link limit, so sharing is disabled. Copy the output instead.');
+      return; // unreachable via the button (disabled), but keep the API honest
     }
-    var url = buildShareUrl(t);
-    function done() {
-      setStatus('ok', 'Share link copied — it opens this page with your JSON prefilled. The JSON travels in the URL, so don\'t share secrets.');
-    }
-    function failed() {
-      window.prompt('Copy this share link (it contains your JSON):', url);
-    }
+    var url = buildShareUrl(text);
+    var done = function () {
+      setStatus('ok', 'Share link copied — opening it prefills this JSON and auto-formats (' + groupNum(url.length) + ' char URL).');
+    };
+    var failed = function () {
+      // Clipboard blocked (e.g. file:// without permission): hand the link
+      // over via a prompt instead of losing it.
+      setStatus('warn', 'Clipboard unavailable — copy the share link from the dialog below.');
+      try { window.prompt('Share link (select all, then Ctrl+C):', url); } catch (e) { /* ignore */ }
+    };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done, function () {
-        if (legacyCopy(url)) done(); else failed();
-      });
+      navigator.clipboard.writeText(url).then(done, failed);
     } else {
       if (legacyCopy(url)) done(); else failed();
     }
