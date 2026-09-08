@@ -1,0 +1,5 @@
+{
+  "name": "missing closing bracket (nested) + missing brace",
+  "input": "{\n  \"a\": [1, { \"b\": [2, 3]\n}",
+  "expected": { "a": [1, { "b": [2, 3] }] }
+}
