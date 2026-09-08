@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Privacy Policy — JSON BFF (In-Browser JSON Tool)</title>
+  <meta
+    name="description"
+    content="JSON BFF privacy policy: all JSON processing happens in your browser. No accounts, no uploads, no stored history; third-party ad cookies only."
+  />
+
+  <!-- Canonical: GitHub Pages project-site URL. Update once a custom domain is set (JSONBFF-PLAN.md §8). -->
+  <link rel="canonical" href="https://cpardue.github.io/JSONBFF/privacy.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Privacy Policy — JSON BFF" />
+  <meta
+    property="og:description"
+    content="All JSON processing happens in your browser. No accounts, no uploads, no stored history."
+  />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cpardue.github.io/JSONBFF/privacy.html" />
+
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- ADSENSE — same post-approval drop-in as index.html (JSONBFF-PLAN.md §6):
+       replace the placeholder publisher ID, uncomment the script there and the
+       push line next to each <ins>, remove the hide rules in css/style.css. -->
+  <!--
+  <script async
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+    crossorigin="anonymous"></script>
+  -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">{ }</span>
+      <span class="brand-name">JSON BFF</span>
+      <span class="brand-tag" aria-hidden="true">Beautify · Format · Fix</span>
+    </div>
+    <nav class="site-nav" aria-label="Site">
+      <a href="index.html">JSON tool</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <div id="ad-header" class="ad-slot ad-slot--header">
+    <!-- AdSense responsive unit (top). After approval, uncomment the push line. -->
+    <ins
+      class="adsbygoogle"
+      style="display:block; max-height:90px;"
+      data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+      data-ad-slot="0000000004"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>
+    <!-- (adsbygoogle = window.adsbygoogle || []).push({}); -->
+  </div>
+
+  <main id="main" class="content-page">
+    <article class="prose">
+      <h1>Privacy Policy</h1>
+      <p class="lede">Last updated: September 8, 2026. JSON BFF is built to need as little of your data as a website can get by with — which here means essentially none.</p>
+
+      <h2>The short version</h2>
+      <p>Your JSON stays in your browser. We do not ask for it, we do not see it, and we cannot retrieve it after you leave the page.</p>
+
+      <h2>What we do not collect or store</h2>
+      <ul>
+        <li><strong>No accounts.</strong> There is no registration and nothing to attach data to.</li>
+        <li><strong>No uploads.</strong> All validation, formatting, and repair run client-side in your browser; no network request ever carries your JSON.</li>
+        <li><strong>No persistent storage.</strong> The site writes nothing to localStorage, sessionStorage, or IndexedDB. Reloading the page clears everything.</li>
+        <li><strong>No analytics for now.</strong> We do not currently embed Google Analytics or any other tracking script. If one is added later, this page will be updated before it goes live.</li>
+      </ul>
+
+      <h2>Share links</h2>
+      <p>When you use <strong>Share</strong>, your JSON is URL-encoded into a link (<code>?json=…</code>). That link <em>is</em> the data: anyone who opens it can read the full JSON, and services in between may see the URL in access logs. Do not put credentials or other sensitive information into share links.</p>
+
+      <h2>Advertising</h2>
+      <p>This site may display advertising served by Google AdSense. Google and its partners may use cookies (or similar technologies) to serve ads based on your prior visits to this or other websites, in accordance with <a href="https://policies.google.com/technologies/ads" rel="noopener">Google's ad policy</a>. You can opt out of personalized advertising in <a href="https://adssettings.google.com" rel="noopener">Google Ads Settings</a>.</p>
+
+      <h2>Browser features we use</h2>
+      <p>Only standard browser APIs: the clipboard (when you click Copy), file downloads (when you click Download), and — in the few browsers that support the experimental WebMCP standard — locally registered tools that operate only on text you pass to them in-page. None of these features sends your data to a third party.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>If the site's data handling ever changes, this page will be updated with a new date before the change takes effect.</p>
+    </article>
+  </main>
+
+  <div id="ad-footer" class="ad-slot ad-slot--footer">
+    <!-- AdSense responsive unit (bottom). After approval, uncomment the push line. -->
+    <ins
+      class="adsbygoogle"
+      style="display:block;"
+      data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+      data-ad-slot="0000000005"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>
+    <!-- (adsbygoogle = window.adsbygoogle || []).push({}); -->
+  </div>
+
+  <footer class="site-footer">
+    <p class="privacy-line">100% client-side — your JSON never leaves this page.</p>
+    <nav aria-label="Footer">
+      <a href="index.html">JSON tool</a>
+      <span aria-hidden="true">·</span>
+      <a href="about.html">About</a>
+    </nav>
+  </footer>
+</body>
+</html>
