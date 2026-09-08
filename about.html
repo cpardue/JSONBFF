@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>About JSON BFF — How It Works, What Fix Repairs &amp; FAQ</title>
+  <meta
+    name="description"
+    content="How JSON BFF works: validate, beautify and repair broken JSON entirely in your browser. What each button does, what the Fix engine repairs, plus answers to common JSON errors."
+  />
+
+  <!-- Canonical: GitHub Pages project-site URL. Update once a custom domain is set (JSONBFF-PLAN.md §8). -->
+  <link rel="canonical" href="https://cpardue.github.io/JSONBFF/about.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="About JSON BFF — How It Works, What Fix Repairs & FAQ" />
+  <meta
+    property="og:description"
+    content="Validate, beautify and repair broken JSON entirely in your browser. Here's what each button does and what the Fix engine repairs."
+  />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://cpardue.github.io/JSONBFF/about.html" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="About JSON BFF — How It Works, What Fix Repairs & FAQ" />
+  <meta
+    name="twitter:description"
+    content="Validate, beautify and repair broken JSON in your browser. Nothing is uploaded."
+  />
+
+  <meta name="theme-color" content="#2563eb" />
+  <!-- Structured data: FAQPage — keep these answers in sync with the visible
+       FAQ below (Google requires structured data to match on-page content). -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "I get an \"Unexpected token ',' in JSON\" error — what is wrong?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Almost always a trailing comma: a comma after the last item before a closing brace or bracket. JSON forbids trailing commas (JavaScript object literals allow them, which is why pasting from code breaks). Fix removes them and tells you how many it removed."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "The parser says \"Unexpected end of JSON input\" — what does that mean?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The document ended before all brackets were closed, usually a missing closing brace or bracket at the bottom — common with truncated logs and pager copy-pastes. Fix closes the open brackets and reports how many it added."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "My data is valid in Python or JavaScript but not in JSON BFF.",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "You likely pasted a language object instead of serialized JSON: single quotes, unquoted keys, True/None (Python) or NaN/undefined (JavaScript). Fix handles all of these; in general, serialize first (for example json.dumps in Python) and you will not hit it."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Sample code copied from the docs will not validate.",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Documentation examples often include comments or placeholder ellipses that are not valid JSON. Fix strips line and block comments automatically; for ellipsis placeholders, substitute real values first — no tool can invent your data."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I share a link to my JSON?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes — the Share button copies a URL containing your JSON. Opening it anywhere prefills the input and runs Format, or Fix if that fails. The JSON lives in the URL itself, so keep shares under about 50 KB and never put sensitive data in a share link."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does JSON BFF upload my data anywhere?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. All parsing, formatting, and repair happen inside your browser; there is no server involved at all. The only data that can leave your machine is ad traffic to Google once ads are enabled, and URLs you deliberately share."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- ADSENSE — same post-approval drop-in as index.html (JSONBFF-PLAN.md §6):
+       replace the placeholder publisher ID, uncomment the script there and the
+       push line next to each <ins>, remove the hide rules in css/style.css. -->
+  <!--
+  <script async
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+    crossorigin="anonymous"></script>
+  -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">{ }</span>
+      <span class="brand-name">JSON BFF</span>
+      <span class="brand-tag" aria-hidden="true">Beautify · Format · Fix</span>
+    </div>
+    <nav class="site-nav" aria-label="Site">
+      <a href="index.html">JSON tool</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <div id="ad-header" class="ad-slot ad-slot--header">
+    <!-- AdSense responsive unit (top). After approval, uncomment the push line. -->
+    <ins
+      class="adsbygoogle"
+      style="display:block; max-height:90px;"
+      data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+      data-ad-slot="0000000002"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>
+    <!-- (adsbygoogle = window.adsbygoogle || []).push({}); -->
+  </div>
+
+  <main id="main" class="content-page">
+    <article class="prose">
+      <h1>About JSON BFF</h1>
+      <p class="lede">JSON BFF — <strong>Beautify · Format · Fix</strong> — is a free, in-browser tool for developers and data people who copy-paste JSON all day. Paste whatever you have, clean or broken: it comes back validated, pretty-printed, repaired, or compressed — without installing anything and without your data leaving the page.</p>
+
+      <h2>What is JSON?</h2>
+      <p>JSON (JavaScript Object Notation) is a lightweight text format for structured data — objects, arrays, strings, numbers, booleans, and null. It is the lingua franca of web APIs, configuration files, and log output; if you touch HTTP, databases, or cloud tooling, you read and write JSON constantly. The catch is that JSON is <em>strict</em>: one missing comma, an unquoted key, or a trailing comma makes a document invalid, and most tools then refuse to show anything useful.</p>
+
+      <h2>What does BFF stand for?</h2>
+      <p>Three letters, three jobs. <strong>B</strong>eautify and <strong>F</strong>ormat are the same primary action — the Format button re-indents valid JSON at 2 spaces, 4 spaces, or tabs so nested structures can be read. <strong>F</strong>ix is the repair engine, the part of the name that matters for broken input: it turns near-JSON from APIs, logs, docs, and other languages back into real JSON.</p>
+      <h2>The buttons, in plain terms</h2>
+      <ul>
+        <li><strong>Validate</strong> — parses your input and reports valid, or the exact line and column where a parser trips. It never changes your text.</li>
+        <li><strong>Format</strong> — pretty-prints valid JSON at the indent you choose (2 spaces by default). Keyboard shortcut: Ctrl/Cmd+Enter.</li>
+        <li><strong>Fix</strong> — runs the repair pipeline below on broken input and reports exactly what it changed, for example “removed 2 trailing commas”. If it cannot fully repair the document, it shows the closest result it reached plus the remaining error.</li>
+        <li><strong>Compact</strong> — strips all whitespace so the document fits one line, with the byte-size delta in the status bar.</li>
+      </ul>
+      <p>The output pane adds <strong>Copy</strong>, <strong>Download .json</strong>, and <strong>Share</strong> — Share copies a link that opens JSON BFF with your input already prefilled, so you can hand someone your exact JSON without a file.</p>
+
+      <h2>What the Fix engine repairs</h2>
+      <p>A string-aware scanner walks your text first, so anything inside a quoted string — URLs containing <code>//</code>, brackets inside values, quotes inside strings — is never touched. Then these passes run in order until the document parses:</p>
+      <ul>
+        <li>strips a UTF-8 BOM and normalizes Windows line endings (CRLF → LF)</li>
+        <li>removes <code>//</code> and <code>/* … */</code> comments copied from code samples</li>
+        <li>converts single-quoted strings to double-quoted ones</li>
+        <li>wraps unquoted object keys in double quotes (JavaScript-object style: <code>{ name: "x" }</code>)</li>
+        <li>deletes trailing commas before <code>}</code> or <code>]</code></li>
+        <li>replaces JavaScript literals (<code>NaN</code>, <code>Infinity</code>, <code>-Infinity</code>, <code>undefined</code>) with <code>null</code></li>
+        <li>replaces Python-style literals (<code>True</code>, <code>False</code>, <code>None</code>) with their JSON equivalents</li>
+        <li>closes missing <code>}</code> / <code>]</code> brackets and removes stray closers</li>
+      </ul>
+      <p>Every pass is safe on already-valid input: Fix is idempotent, so running it on good JSON reports 0 changes.</p>
+      <h2>Privacy</h2>
+      <p>Everything runs in your browser. Your JSON is never uploaded, logged, or stored — the page keeps no history and uses no local storage. The only things that can leave your machine are ad requests to Google once ads are enabled (see the <a href="privacy.html">privacy policy</a>) and, if you deliberately hit Share, the URL itself: share links encode your JSON into the address bar, so never put secrets in one.</p>
+
+      <h2>Frequently asked questions</h2>
+      <h3>I get “Unexpected token ',' in JSON” — what is wrong?</h3>
+      <p>Almost always a trailing comma: a comma after the last item before a <code>}</code> or <code>]</code>. JSON forbids them (JavaScript object literals allow them, which is why pasting from code breaks). Fix removes them and tells you how many it removed.</p>
+
+      <h3>The parser says “Unexpected end of JSON input” — what does that mean?</h3>
+      <p>The document ended before all brackets were closed, usually a missing closing brace or bracket at the bottom — common with truncated logs and pager copy-pastes. Fix closes the open brackets and reports how many it added.</p>
+
+      <h3>My data is valid in Python or JavaScript but not in JSON BFF.</h3>
+      <p>You likely pasted a language object instead of serialized JSON: single quotes, unquoted keys, <code>True</code>/<code>None</code> (Python) or <code>NaN</code>/<code>undefined</code> (JavaScript). Fix handles all of these; in general, serialize first (<code>json.dumps(obj)</code> in Python) and you will not hit it.</p>
+
+      <h3>Sample code copied from the docs will not validate.</h3>
+      <p>Documentation examples often include comments or placeholder ellipses that are not valid JSON. Fix strips line and block comments automatically; for <code>…</code> placeholders, substitute real values first — no tool can invent your data.</p>
+
+      <h3>Can I share a link to my JSON?</h3>
+      <p>Yes — the Share button copies a URL containing your JSON. Opening it anywhere prefills the input and runs Format, or Fix if that fails. The JSON lives in the URL itself, so keep shares under about 50 KB and never put sensitive data in a share link.</p>
+
+      <h3>Does JSON BFF upload my data anywhere?</h3>
+      <p>No. All parsing, formatting, and repair happen inside your browser; there is no server involved at all. See the <a href="privacy.html">privacy policy</a> for the full story, including how ads work once enabled.</p>
+
+      <h2>Browser support</h2>
+      <p>JSON BFF is a static page with zero dependencies. It works in any current browser — Chrome, Edge, Firefox, and Safari, on desktop and mobile — and keeps working offline once loaded. No account, no install, no extension.</p>
+
+      <p class="cta-row"><a class="btn btn--primary" href="index.html">Open the JSON tool</a></p>
+    </article>
+  </main>
+
+  <div id="ad-footer" class="ad-slot ad-slot--footer">
+    <!-- AdSense responsive unit (bottom). After approval, uncomment the push line. -->
+    <ins
+      class="adsbygoogle"
+      style="display:block;"
+      data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+      data-ad-slot="0000000003"
+      data-ad-format="auto"
+      data-full-width-responsive="true"></ins>
+    <!-- (adsbygoogle = window.adsbygoogle || []).push({}); -->
+  </div>
+
+  <footer class="site-footer">
+    <p class="privacy-line">100% client-side — your JSON never leaves this page.</p>
+    <nav aria-label="Footer">
+      <a href="index.html">JSON tool</a>
+      <span aria-hidden="true">·</span>
+      <a href="about.html">About</a>
+      <span aria-hidden="true">·</span>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </footer>
+</body>
+</html>
