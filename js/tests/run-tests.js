@@ -314,7 +314,7 @@ function click(env, id) { var h = env.els[id]._ls.click; if (h) h(); }
   var robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, 'utf8') : '';
   var smMatch = /Sitemap:\s*(\S+)/i.exec(robots);
   check('static: robots.txt allows all crawlers and names a sitemap',
-    !!robots && /User-agent:\s*\*/.test(robots) && /Allow:\s*\/\//.test(robots) && !!smMatch,
+    !!robots && /User-agent:\s*\*/.test(robots) && /Allow:\s*\//.test(robots) && !!smMatch,
     'robots.txt: ' + JSON.stringify(robots.slice(0, 160)));
   if (smMatch) {
     var smFile = smMatch[1].replace(/^https?:\/\/[^/]+\/?/, '').split('/').pop();
