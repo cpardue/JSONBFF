@@ -1,0 +1,11 @@
+{
+  "name": "the disaster: comments + single quotes + unquoted keys + trailing comma + JS/Python literals + missing brackets",
+  "input": "// config export (v2)\n{ /* meta */\n  'name': 'disaster',   // single quoted\n  items: [1, 2,],       // trailing comma\n  flags: { on: True, off: None },\n  ratio: NaN,\n  meta: { deep: [ 'x' ],\n}\n",
+  "expected": {
+    "name": "disaster",
+    "items": [1, 2],
+    "flags": { "on": true, "off": null },
+    "ratio": null,
+    "meta": { "deep": ["x"] }
+  }
+}
