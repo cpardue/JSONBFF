@@ -1,0 +1,9 @@
+{
+  "name": "line + block comments (string values contain //)",
+  "input": "// top-level comment (do not panic)\n{ /* leading */ url: \"https://example.com//path\",\n  note: \"not a // comment\",\n  end: 1 /* trailing block */ }\n/* done */\n",
+  "expected": {
+    "url": "https://example.com//path",
+    "note": "not a // comment",
+    "end": 1
+  }
+}
