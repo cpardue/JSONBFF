@@ -61,7 +61,7 @@ Single page, top to bottom:
 ├──────────────────────────────────────────────────────────┤
 │ Toolbar: [Validate] [Format] [Fix] [Compact]      [Clear]│
 │          Indent: ( 2sp | 4sp | Tab )                        │
-├───────────────────────────────┬──────────────────────────────┤
+├───────────────────────────┬──────────────────────────────┤
 │ INPUT textarea            │ OUTPUT (read-only <pre>)      │
 │ (spellcheck off, mono)    │ [Copy] [Download .json] [Share]│
 ├───────────────────────────┴──────────────────────────────┤
