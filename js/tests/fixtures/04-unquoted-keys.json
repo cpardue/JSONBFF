@@ -1,0 +1,9 @@
+{
+  "name": "unquoted keys (JS-object style)",
+  "input": "{\n  name: \"json bff\",\n  tags: [\"tool\", \"dev\"],\n  meta: { version: 1, active: true }\n}",
+  "expected": {
+    "name": "json bff",
+    "tags": ["tool", "dev"],
+    "meta": { "version": 1, "active": true }
+  }
+}
