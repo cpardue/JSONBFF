@@ -1,0 +1,8 @@
+# JSON BFF — robots.txt (JSONBFF-PLAN.md §7)
+# Everything is public and meant to be crawled.
+User-agent: *
+Allow: /
+
+# Sitemap lives at the GitHub Pages project-site URL (regenerate if a custom
+# domain is added — JSONBFF-PLAN.md §8 step 5).
+Sitemap: https://cpardue.github.io/JSONBFF/sitemap.xml
