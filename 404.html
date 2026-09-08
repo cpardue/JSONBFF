@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Page not found (404) — JSON BFF</title>
+  <meta
+    name="description"
+    content="The page you requested could not be found. Go back to JSON BFF — the free in-browser tool to validate, format and fix JSON."
+  />
+  <!-- 404 pages should not rank (JSONBFF-PLAN.md §7). -->
+  <meta name="robots" content="noindex" />
+
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- =====================================================================
+        GitHub Pages serves this file automatically for any unknown path.
+        Links stay relative (JSONBFF-PLAN.md §8: project site, relative
+        everywhere) — that resolves correctly for the common one-level-deep
+        miss (e.g. /JSONBFF/typo). Deeper paths simply re-serve this page.
+        ===================================================================== -->
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">{ }</span>
+      <span class="brand-name">JSON BFF</span>
+      <span class="brand-tag" aria-hidden="true">Beautify · Format · Fix</span>
+    </div>
+    <nav class="site-nav" aria-label="Site">
+      <a href="index.html">JSON tool</a>
+      <a href="about.html">About</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main id="main" class="content-page">
+    <article class="prose prose--center">
+      <p class="error-code" aria-hidden="true">404</p>
+      <h1>This page could not be found.</h1>
+      <p>The link may be old, or the address may have a typo. If you were working in the JSON tool, your text is still in your browser tab — it never left the page.</p>
+      <p class="cta-row">
+        <a class="btn btn--primary" href="index.html">Back to the JSON tool</a>
+        <a class="btn" href="about.html">About JSON BFF</a>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p class="privacy-line">100% client-side — your JSON never leaves this page.</p>
+    <nav aria-label="Footer">
+      <a href="index.html">JSON tool</a>
+      <span aria-hidden="true">·</span>
+      <a href="about.html">About</a>
+      <span aria-hidden="true">·</span>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </footer>
+</body>
+</html>
