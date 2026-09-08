@@ -1,0 +1,11 @@
+{
+  "name": "JS literals: NaN / undefined / Infinity",
+  "input": "{ \"a\": NaN, \"b\": undefined, \"c\": Infinity, \"d\": -Infinity, \"s\": \"keep NaN here\" }",
+  "expected": {
+    "a": null,
+    "b": null,
+    "c": null,
+    "d": null,
+    "s": "keep NaN here"
+  }
+}
