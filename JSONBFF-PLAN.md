@@ -61,7 +61,7 @@ Single page, top to bottom:
 ├──────────────────────────────────────────────────────────┤
 │ Toolbar: [Validate] [Format] [Fix] [Compact]      [Clear]│
 │          Indent: ( 2sp | 4sp | Tab )                        │
-├─────────────────────────┬──────────────────────────────┤
+├─────────────────────────────┬──────────────────────────────┤
 │ INPUT textarea            │ OUTPUT (read-only <pre>)      │
 │ (spellcheck off, mono)    │ [Copy] [Download .json] [Share]│
 ├───────────────────────────┴──────────────────────────────┤
@@ -160,7 +160,7 @@ Minimum fixture set:
 
 ---
 
-## 6. `index.html` specifications
+## 6. `index.html` specifics
 
 - `<title>`: `JSON BFF — Beautify, Format & Fix JSON Online (Free, In-Browser)`
 - `<meta name="description">` (~155 chars, natural keywords): "Free online JSON tool to validate, format/beautify, repair broken JSON (trailing commas, missing brackets, single quotes) and compact it — all in your browser, nothing uploaded."
