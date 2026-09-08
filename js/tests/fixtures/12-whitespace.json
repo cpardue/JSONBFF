@@ -1,0 +1,5 @@
+{
+  "name": "whitespace-only input (no crash, clean status)",
+  "input": "   \t\r\n  ",
+  "expectOk": false
+}
