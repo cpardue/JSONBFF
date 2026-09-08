@@ -1,0 +1,10 @@
+{
+  "name": "Python literals: True / False / None",
+  "input": "{ \"a\": True, \"b\": False, \"c\": None, \"s\": \"True story\" }",
+  "expected": {
+    "a": true,
+    "b": false,
+    "c": null,
+    "s": "True story"
+  }
+}
