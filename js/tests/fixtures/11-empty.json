@@ -1,0 +1,5 @@
+{
+  "name": "empty input (no crash, clean status)",
+  "input": "",
+  "expectOk": false
+}
