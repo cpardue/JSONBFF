@@ -1,0 +1,5 @@
+{
+  "name": "stray closing bracket removed",
+  "input": "{ \"a\": [1, 2] ] }",
+  "expected": { "a": [1, 2] }
+}
