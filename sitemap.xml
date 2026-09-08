@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- JSON BFF — sitemap (JSONBFF-PLAN.md §7). Generated 2026-09-08 for the
+     GitHub Pages project-site URL. Regenerate lastmod/URLs if a custom
+     domain is added (§8 step 5). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://cpardue.github.io/JSONBFF/index.html</loc>
+    <lastmod>2026-09-08</lastmod>
+  </url>
+  <url>
+    <loc>https://cpardue.github.io/JSONBFF/about.html</loc>
+    <lastmod>2026-09-08</lastmod>
+  </url>
+  <url>
+    <loc>https://cpardue.github.io/JSONBFF/privacy.html</loc>
+    <lastmod>2026-09-08</lastmod>
+  </url>
+</urlset>
