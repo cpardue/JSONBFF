@@ -1,0 +1,5 @@
+{
+  "name": "trailing commas at multiple levels",
+  "input": "{\n  \"a\": [1, 2,],\n  \"b\": {\n    \"c\": true,\n  },\n}",
+  "expected": { "a": [1, 2], "b": { "c": true } }
+}
