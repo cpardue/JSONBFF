@@ -1,0 +1,13 @@
+{
+  "name": "already valid, tricky strings (must not change)",
+  "input": "{\n  \"url\": \"https://example.com//a[b]c\",\n  \"msg\": \"he said \\\"hi\\\" at {noon} and [met]\",\n  \"apos\": \"it's fine\",\n  \"esc\": \"back\\\\slash and tab\\there\",\n  \"emoji\": \"✅ ok\",\n  \"nest\": { \"arr\": [1, 2, 3] }\n}",
+  "expectNoChanges": true,
+  "expected": {
+    "url": "https://example.com//a[b]c",
+    "msg": "he said \"hi\" at {noon} and [met]",
+    "apos": "it's fine",
+    "esc": "back\\slash and tab\there",
+    "emoji": "✅ ok",
+    "nest": { "arr": [1, 2, 3] }
+  }
+}
