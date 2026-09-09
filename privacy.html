@@ -10,8 +10,8 @@
     content="JSON BFF privacy policy: all JSON processing happens in your browser. No accounts, no uploads, no stored history; third-party ad cookies only."
   />
 
-  <!-- Canonical: GitHub Pages project-site URL. Update once a custom domain is set (JSONBFF-PLAN.md §8). -->
-  <link rel="canonical" href="https://cpardue.github.io/JSONBFF/privacy.html" />
+  <!-- Canonical: final production URL. Custom domain live 2026-09-09; cpardue.github.io/JSONBFF/privacy.html 301-redirects here (§8). -->
+  <link rel="canonical" href="https://chris-pardue.com/JSONBFF/privacy.html" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="Privacy Policy — JSON BFF" />
@@ -20,9 +20,14 @@
     content="All JSON processing happens in your browser. No accounts, no uploads, no stored history."
   />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://cpardue.github.io/JSONBFF/privacy.html" />
+  <meta property="og:url" content="https://chris-pardue.com/JSONBFF/privacy.html" />
 
   <meta name="theme-color" content="#2563eb" />
+
+  <!-- Favicon: inline SVG data URI — no favicon.ico request can 404 (keeps
+       the console clean, JSONBFF-PLAN.md §11) and adds zero files/deps. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='monospace' font-size='28' font-weight='bold' fill='white' text-anchor='middle'%3E%7B%20%7D%3C/text%3E%3C/svg%3E" />
+
   <link rel="stylesheet" href="css/style.css" />
 
   <!-- ADSENSE — same post-approval drop-in as index.html (JSONBFF-PLAN.md §6):
