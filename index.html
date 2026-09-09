@@ -10,8 +10,9 @@
     content="Free online JSON tool to validate, format/beautify, repair broken JSON (trailing commas, missing brackets, single quotes) and compact it — all in your browser, nothing uploaded."
   />
 
-  <!-- Canonical: GitHub Pages project-site URL. Update once a custom domain is set (JSONBFF-PLAN.md §8). -->
-  <link rel="canonical" href="https://cpardue.github.io/JSONBFF/" />
+  <!-- Canonical: final production URL. Custom domain live 2026-09-09 (behind
+       Cloudflare); cpardue.github.io/JSONBFF/ now 301-redirects here (§8). -->
+  <link rel="canonical" href="https://chris-pardue.com/JSONBFF/" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="JSON BFF — Beautify, Format & Fix JSON Online (Free, In-Browser)" />
@@ -20,7 +21,7 @@
     content="Validate, beautify, repair and compact JSON right in your browser. Trailing commas, single quotes, missing brackets — fixed without uploading a byte."
   />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://cpardue.github.io/JSONBFF/" />
+  <meta property="og:url" content="https://chris-pardue.com/JSONBFF/" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary" />
@@ -32,6 +33,10 @@
 
   <meta name="theme-color" content="#2563eb" />
 
+  <!-- Favicon: inline SVG data URI — no favicon.ico request can 404 (keeps
+       the console clean, JSONBFF-PLAN.md §11) and adds zero files/deps. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%232563eb'/%3E%3Ctext x='32' y='43' font-family='monospace' font-size='28' font-weight='bold' fill='white' text-anchor='middle'%3E%7B%20%7D%3C/text%3E%3C/svg%3E" />
+
   <!-- Structured data: JSON-LD WebApplication (JSONBFF-PLAN.md §6) -->
   <script type="application/ld+json">
   {
@@ -41,7 +46,7 @@
     "description": "Free in-browser JSON tool: validate, format/beautify, repair broken JSON and compact it. 100% client-side, nothing uploaded.",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Any (web browser)",
-    "url": "https://cpardue.github.io/JSONBFF/",
+    "url": "https://chris-pardue.com/JSONBFF/",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
   </script>
@@ -49,15 +54,15 @@
   <link rel="stylesheet" href="css/style.css" />
 
   <!-- =====================================================================
-       ADSENSE — post-approval drop-in (JSONBFF-PLAN.md §6)
-       After AdSense approval:
-       1. Replace every ca-pub-XXXXXXXXXXXXXXXX / 0000000000 with the real IDs.
-       2. Uncomment the <script> tag below.
-       3. Uncomment the (adsbygoogle ... push) line next to each <ins> in the body.
-       4. Remove the two local-testing hide rules at the top of css/style.css.
-       Kept commented while the publisher ID is a placeholder so the site
-       passes the "zero console errors" definition of done (JSONBFF-PLAN.md §11).
-       ===================================================================== -->
+        ADSENSE — post-approval drop-in (JSONBFF-PLAN.md §6)
+        After AdSense approval:
+        1. Replace every ca-pub-XXXXXXXXXXXXXXXX / 0000000000 with the real IDs.
+        2. Uncomment the <script> tag below.
+        3. Uncomment the (adsbygoogle ... push) line next to each <ins> in the body.
+        4. Remove the two local-testing hide rules at the top of css/style.css.
+        Kept commented while the publisher ID is a placeholder so the site
+        passes the "zero console errors" definition of done (JSONBFF-PLAN.md §11).
+        ===================================================================== -->
   <!--
   <script async
     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
@@ -65,18 +70,19 @@
   -->
 
   <!-- =====================================================================
-       WEBMCP origin trial (JSONBFF-PLAN.md §12) — fill in after deploy (§8).
-       The WebMCP API (document.modelContext) is in Chrome/Edge origin
-       trials; js/webmcp.js is a silent no-op without it, so the site works
-       everywhere either way. Post-deploy:
-       1. Join the WebMCP origin trial and request a token for this site's
-          ORIGIN (https://cpardue.github.io — note project-site origins are
-          shared across repos; a custom domain is a different origin →
-          re-request the token there, §8 step 4). Tokens expire (~6 months).
-       2. Uncomment the meta tag below with the real token.
-       3. Verify the tools register (Model Context Tool Inspector extension,
-          or document.modelContext.getTools() in DevTools).
-       ===================================================================== -->
+        WEBMCP origin trial (JSONBFF-PLAN.md §12) — fill in after deploy (§8).
+        The WebMCP API (document.modelContext) is in Chrome/Edge origin
+        trials; js/webmcp.js is a silent no-op without it, so the site works
+        everywhere either way. Post-deploy:
+        1. Join the WebMCP origin trial and request a token for this site's
+           ORIGIN — production origin is now https://chris-pardue.com
+           (custom domain live 2026-09-09; cpardue.github.io 301s there, so
+           browsers end up on the chris-pardue.com origin). Tokens expire
+           (~6 months) — re-request on renewal or any domain change.
+        2. Uncomment the meta tag below with the real token.
+        3. Verify the tools register (Model Context Tool Inspector extension,
+           or document.modelContext.getTools() in DevTools).
+        ===================================================================== -->
   <!-- <meta http-equiv="OriginTrial" content="REPLACE-WITH-ORIGIN-TRIAL-TOKEN" /> -->
 
   <!-- ANALYTICS (GA4) — same pattern as AdSense: add the gtag snippet and
