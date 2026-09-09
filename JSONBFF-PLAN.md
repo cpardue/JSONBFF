@@ -64,7 +64,7 @@ Single page, top to bottom:
 ├───────────────────────┬──────────────────────────────────┤
 │ INPUT textarea            │ OUTPUT (read-only <pre>)      │
 │ (spellcheck off, mono)    │ [Copy] [Download .json] [Share]│
-├───────────────────────┴──────────────────────────────────┤
+├───────────────────────────┴──────────────────────────────┤
 │ Status bar: ✓ Valid · 12 objects   |  ✗ Error at line 4, │
 │             column 7: ...      |  🔧 Fixed 3 issues: …   │
 ├──────────────────────────────────────────────────────────┤
@@ -250,4 +250,3 @@ Risks & notes:
 1. Join the Chrome/Edge origin trial and request a token for the production origin **https://chris-pardue.com** (custom domain live 2026-09-09 — §8; cpardue.github.io now 301s there, so browsers land on the chris-pardue.com origin and no github.io token is needed). Tokens are origin-scoped and expire (~6 months) — renew on expiry or any domain change.
 2. Uncomment the `<meta http-equiv="OriginTrial" content="…">` placeholder in `index.html`'s `<head>` and paste the token (the head comment block in the file explains this step), then commit + push.
 3. Verify via the Model Context Tool Inspector extension or DevTools: `document.modelContext.getTools()` should list all four `json_*` tools; optionally execute one through the inspector (e.g. `json_fix` on a trailing-comma string) to confirm end-to-end behavior.
-
