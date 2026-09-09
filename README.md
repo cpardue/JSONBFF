@@ -62,7 +62,7 @@ js/tests/             # zero-dep Node test runner + fixtures
 
 ## Deploy (GitHub Pages)
 
-Settings → **Pages** → Build and deployment → *Deploy from a branch* → `main` / root → live at <https://cpardue.github.io/JSONBFF/>. Details incl. custom domain in [the plan, §8](./JSONBFF-PLAN.md).
+Settings → **Pages** → Build and deployment → *Deploy from a branch* → `main` / root → live at <https://chris-pardue.com/JSONBFF/> (custom domain behind Cloudflare; `cpardue.github.io/JSONBFF/` 301-redirects there). Details in [the plan, §8](./JSONBFF-PLAN.md).
 
 ## Roadmap
 
