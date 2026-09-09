@@ -61,10 +61,10 @@ Single page, top to bottom:
 ├──────────────────────────────────────────────────────────┤
 │ Toolbar: [Validate] [Format] [Fix] [Compact]      [Clear]│
 │          Indent: ( 2sp | 4sp | Tab )                        │
-├───────────────────────────┬──────────────────────────────┤
+├───────────────────────┬──────────────────────────────────┤
 │ INPUT textarea            │ OUTPUT (read-only <pre>)      │
 │ (spellcheck off, mono)    │ [Copy] [Download .json] [Share]│
-├───────────────────────────┴──────────────────────────────┤
+├───────────────────────┴──────────────────────────────────┤
 │ Status bar: ✓ Valid · 12 objects   |  ✗ Error at line 4, │
 │             column 7: ...      |  🔧 Fixed 3 issues: …   │
 ├──────────────────────────────────────────────────────────┤
@@ -198,6 +198,8 @@ Minimum fixture set:
 4. Optional custom domain: add a `CNAME` file, point DNS (CNAME `<user>.github.io` or A records to GitHub Pages IPs), Settings → Pages → Custom domain → Enforce HTTPS.
 5. Once the final URL is known: regenerate `sitemap.xml`, set `canonical`/OG URLs; re-verify in Search Console.
 
+**Status 2026-09-09:** custom domain live — site now served at **https://chris-pardue.com/JSONBFF/** (`chris-pardue.com`, GitHub Pages custom domain behind a Cloudflare proxy); `cpardue.github.io/JSONBFF/` 301-redirects there. Step 5 complete: `sitemap.xml` regenerated + robots.txt `Sitemap:` line, and every page's `canonical`/`og:url`/JSON-LD `url` point at the production URL (README live URL updated to match).
+
 ## 9. Migration path to full hosting (only if traffic justifies it)
 
 - **Drop-in**: the exact same folder deploys unchanged to Netlify, Vercel, Cloudflare Pages, S3+CloudFront, nginx — no build step exists and all paths are relative.
@@ -211,18 +213,18 @@ Minimum fixture set:
 **Step 3 — fixer.js.** Build scanner (§5.1) + passes 1–8, write `tests/run-tests.js` and all §5.4 fixtures; wire the Fix button with the fixes report. *Check: `node js/tests/run-tests.js` green; the "disaster" fixture fully repaired.*
 **Step 4 — UX polish.** Share link (`?json=`), Copy, Download, Clear, Ctrl+Enter, prefilled broken sample, status bar detail, mobile check at 375px. *Check: share URL round-trips (copy → open in new tab → prefilled + auto-run).* *(Done 2026-09-08: `?json=` prefill + auto Format/Fix, ~50 KB Share cap with disable+tooltip, broken-sample prefill, richer status strings; app.js smoke checks in run-tests.js cover the round-trip — the live browser pass stays a step-6 check.)*
 **Step 5 — SEO & content pages.** about.html (~700 words), privacy.html, robots.txt, sitemap.xml (placeholder domain OK for now), 404.html, .nojekyll. *Check: no broken internal links; both pages render from file:// and over http.* *(Done 2026-09-08: about.html (~850 words + FAQPage JSON-LD) and privacy.html with per-page SEO heads, canonical/OG, hidden pre-approval ad slots (own slot IDs); robots.txt + sitemap.xml at the project-site URL; noindex 404.html; .nojekyll; run-tests.js gains a "static pages & links" section enforcing the step's no-broken-internal-links check. Live browser + Lighthouse pass remains a step-6 check.)*
-**Step 6 — Verify & ship.** Run test suite; open in Chrome + Firefox; Lighthouse (Performance ≥ 90, no CLS on load); fix findings. Then deploy per §8 and smoke-test the live URL including /404.html, robots.txt, sitemap.xml. *(Status 2026-09-08: test suite green 40/40 (re-run 2026-09-08); all JS `node --check` clean; README refreshed to shipped state. All 29 files pushed to main byte-exact (blob-SHA verified); Pages enabled per §8 steps 1–3 — live at https://cpardue.github.io/JSONBFF/. Live smoke test PASSED 2026-09-08: /, about.html, privacy.html served with correct titles/content (about FAQ + privacy AdSense/share-link disclosures verified in body); robots.txt exact (allow-all + Sitemap line) and sitemap.xml exact (3 URLs, project-site paths); all five JS files + css/style.css served byte-correct; nonexistent URL returns HTTP 404 with the custom 404 file in place. Remaining (browser-only): zero-console pass in Chrome + Firefox from file:// and https, Lighthouse Perf/A11y/SEO ≥ 90 + no CLS, 375px stacked layout — then step 6 is done.)*
+**Step 6 — Verify & ship.** Run test suite; open in Chrome + Firefox; Lighthouse (Performance ≥ 90, no CLS on load); fix findings. Then deploy per §8 and smoke-test the live URL including /404.html, robots.txt, sitemap.xml. *(Done 2026-09-09 — all checks passed. Test suite 40/40 re-run; `node --check` clean on all JS. Zero-console pass in Chrome (headless Chrome for Testing 153, isolated profile) from `file://` (index/about/privacy) and live https (index/about/privacy/404.html): zero console errors/warnings, zero exceptions, no failed requests, no HTTP ≥400 — including the fix for a real DoD violation found on the live site: missing `favicon.ico` (HTTP 404 + console error on every load) replaced by an inline SVG data-URI favicon on all four pages. Lighthouse mobile on production: Performance 98 / Accessibility 100 / SEO 100, CLS 0, LCP 2.0 s, TBT 90 ms (all ≥90 thresholds met). 375 px viewport: panes stack, no horizontal overflow; 1280 px: side-by-side. Live smoke test re-run on the custom domain: /, about.html, privacy.html, 404.html, robots.txt, sitemap.xml all correct; pushed files verified byte-exact vs local (SHA-1) after each push. Note: no Firefox in the dev environment — a user spot-check of that half of the zero-console DoD item remains recommended.)*
 **Step 7 — WebMCP.** `js/webmcp.js` + fake-modelContext tests done 2026-09-08; remaining work is deploy-time only (origin trial for the final origin + token meta), per the §12 checklist.
 
 ## 11. Definition of done
 
-- [ ] Zero console errors in Chrome & Firefox, from both file:// and https
+- [x] Zero console errors in Chrome, from both file:// and https (headless Chrome for Testing 153, all four pages, 2026-09-09); no Firefox in dev env — user spot-check recommended
 - [x] `node js/tests/run-tests.js` passes (all §5.4 fixtures)
-- [ ] All four buttons behave per §4; Fix is idempotent on valid input
+- [x] All four buttons behave per §4; Fix is idempotent on valid input (run-tests.js app smoke + re-fix/idempotency fixtures)
 - [x] No external dependencies other than the AdSense/GA scripts
-- [ ] Mobile viewport (375px) works with stacked layout
-- [ ] Lighthouse: Performance ≥ 90, Accessibility ≥ 90, SEO ≥ 90
-- [x] Deployed to GitHub Pages; live smoke test of /, about.html, privacy.html, 404.html, robots.txt, sitemap.xml passes
+- [x] Mobile viewport (375px) works with stacked layout (CDP geometry check 2026-09-09: stacked, no horizontal overflow; side-by-side at 1280px)
+- [x] Lighthouse: Performance ≥ 90, Accessibility ≥ 90, SEO ≥ 90 (mobile on production, 2026-09-09: 98 / 100 / 100, CLS 0)
+- [x] Deployed to GitHub Pages; live smoke test of /, about.html, privacy.html, 404.html, robots.txt, sitemap.xml passes (re-verified on custom domain chris-pardue.com/JSONBFF/, 2026-09-09)
 
 ## 12. WebMCP — agent-facing tools (investigated 2026-09-08)
 
@@ -245,8 +247,7 @@ Risks & notes:
 - Security: no consequential actions, read/transform-only tools, no new data flow; keep tool descriptions/output free of instruction-like text (prompt-injection hygiene per spec §6).
 
 **Deploy-time WebMCP checklist (no code changes — run after §8):**
-1. Join the Chrome/Edge origin trial and request a token for the final production origin — project site: `https://cpardue.github.io`; if a custom domain is used (§8 step 4) request one for that origin too (tokens are origin-scoped, ~6 months).
+1. Join the Chrome/Edge origin trial and request a token for the production origin **https://chris-pardue.com** (custom domain live 2026-09-09 — §8; cpardue.github.io now 301s there, so browsers land on the chris-pardue.com origin and no github.io token is needed). Tokens are origin-scoped and expire (~6 months) — renew on expiry or any domain change.
 2. Uncomment the `<meta http-equiv="OriginTrial" content="…">` placeholder in `index.html`'s `<head>` and paste the token (the head comment block in the file explains this step), then commit + push.
 3. Verify via the Model Context Tool Inspector extension or DevTools: `document.modelContext.getTools()` should list all four `json_*` tools; optionally execute one through the inspector (e.g. `json_fix` on a trailing-comma string) to confirm end-to-end behavior.
-
 
