@@ -3,6 +3,7 @@
 User-agent: *
 Allow: /
 
-# Sitemap lives at the GitHub Pages project-site URL (regenerate if a custom
-# domain is added — JSONBFF-PLAN.md §8 step 5).
-Sitemap: https://cpardue.github.io/JSONBFF/sitemap.xml
+# Sitemap lives at the production URL — custom domain live 2026-09-09;
+# cpardue.github.io/JSONBFF/ now 301-redirects to chris-pardue.com/JSONBFF/
+# (JSONBFF-PLAN.md §8 step 5).
+Sitemap: https://chris-pardue.com/JSONBFF/sitemap.xml
