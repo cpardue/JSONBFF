@@ -303,11 +303,11 @@
           i += 2;
           var close = region.indexOf('*/', i);
           i = close === -1 ? n : close + 2;
+          s += ' ';
           count++;
           continue;
         }
-        s += region.charAt(i);
-        i++;
+        s += region.charAt(i++);
       }
       return s;
     });
