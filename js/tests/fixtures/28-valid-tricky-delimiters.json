@@ -1,0 +1,6 @@
+{
+  "name": "valid JSON that looks broken — strings holding , : { } and \"1 2\", exponent, fraction (checklist §2; must not change)",
+  "input": "{\"a\": \"x, y : {z} [w]\", \"b\": 12, \"c\": [\"1 2\", \"3 4\"], \"d\": {\"e\": [true, false, null]}, \"f\": 1e5, \"g\": -1.5}",
+  "expected": { "a": "x, y : {z} [w]", "b": 12, "c": ["1 2", "3 4"], "d": { "e": [true, false, null] }, "f": 100000, "g": -1.5 },
+  "expectNoChanges": true
+}
