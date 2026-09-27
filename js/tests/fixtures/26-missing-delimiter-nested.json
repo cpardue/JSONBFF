@@ -1,0 +1,5 @@
+{
+  "name": "several missing delimiters across nested objects and arrays (checklist §2)",
+  "input": "{ \"a\": [ 1 2, { \"b\": 3 } { \"c\": 4 } ], \"d\": 5 \"e\": [ 6 ], \"f\": { \"g\": 7 \"h\": 8 } }",
+  "expected": { "a": [1, 2, { "b": 3 }, { "c": 4 }], "d": 5, "e": [6], "f": { "g": 7, "h": 8 } }
+}
