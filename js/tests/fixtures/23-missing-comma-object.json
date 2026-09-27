@@ -1,0 +1,5 @@
+{
+  "name": "missing comma between object members (checklist §2 + §9)",
+  "input": "{ \"a\": 1 \"b\": 2 }",
+  "expected": { "a": 1, "b": 2 }
+}
