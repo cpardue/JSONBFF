@@ -1,0 +1,5 @@
+{
+  "name": "more than one missing token per gap — no guess, clean failure (IMPROVEMENTS §1.5)",
+  "input": "{ 1 2 3 }",
+  "expectOk": false
+}
