@@ -1,0 +1,5 @@
+{
+  "name": "colon inside an array — structural nonsense, clean failure (IMPROVEMENTS §1.5)",
+  "input": "[1, \"a\": 2]",
+  "expectOk": false
+}
