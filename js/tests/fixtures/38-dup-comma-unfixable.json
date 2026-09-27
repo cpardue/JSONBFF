@@ -1,0 +1,5 @@
+{
+  "name": "double comma that still leaves a keyless member — clean failure, no loop (checklist §2.4)",
+  "input": "{\"a\":1,,2}",
+  "expectOk": false
+}
