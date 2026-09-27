@@ -1,0 +1,5 @@
+{
+  "name": "missing value before close — no safe repair, clean failure (IMPROVEMENTS §1.5)",
+  "input": "{ \"a\": , }",
+  "expectOk": false
+}
