@@ -1,0 +1,5 @@
+{
+  "name": "prose pasted alongside JSON (CRLF) — sliced to outermost container (checklist §0)",
+  "input": "Here is the config you asked for:\r\n{\"a\": 1, \"b\": [2, 3]}\r\nHope this helps!",
+  "expected": { "a": 1, "b": [2, 3] }
+}
