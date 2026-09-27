@@ -1,0 +1,5 @@
+{
+  "name": "duplicate commas + colons across nesting, with trailing-comma interplay (checklist §2.4)",
+  "input": "{\"a\": [1,,2,,,], \"b\"::3,,\"c\":4}",
+  "expected": { "a": [1, 2], "b": 3, "c": 4 }
+}
