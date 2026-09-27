@@ -1,0 +1,5 @@
+{
+  "name": "double colon after a key (checklist §2.4)",
+  "input": "{\"a\"::\"b\", \"c\":1}",
+  "expected": { "a": "b", "c": 1 }
+}
