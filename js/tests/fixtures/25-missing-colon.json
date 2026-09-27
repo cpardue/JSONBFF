@@ -1,0 +1,5 @@
+{
+  "name": "missing colons — scalar value, container value, key/value/key chain (checklist §2)",
+  "input": "[ { \"a\" 1 }, { \"b\" { \"c\": 2 } }, { \"d\" \"e\" \"f\": 3 } ]",
+  "expected": [ { "a": 1 }, { "b": { "c": 2 } }, { "d": "e", "f": 3 } ]
+}
