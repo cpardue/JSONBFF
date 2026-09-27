@@ -1,0 +1,5 @@
+{
+  "name": "pass 6 strips the trailing comma, then pass 11 certifies the swap in the same round",
+  "input": "{ \"a\" : { \"b\" : 1 ] , }",
+  "expected": { "a": { "b": 1 } }
+}
