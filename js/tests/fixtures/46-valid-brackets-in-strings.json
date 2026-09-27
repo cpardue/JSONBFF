@@ -1,0 +1,6 @@
+{
+  "name": "valid JSON full of brackets inside strings — never touched",
+  "input": "{ \"a\" : \"]}\", \"b\" : [ \"[]\", { \"c\" : \"{}\" } ] }",
+  "expected": { "a": "]}", "b": [ "[]", { "c": "{}" } ] },
+  "expectNoChanges": true
+}
