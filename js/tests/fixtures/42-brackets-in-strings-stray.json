@@ -1,0 +1,5 @@
+{
+  "name": "brackets inside string spans never count; a real stray closer is still removed",
+  "input": "{ \"a\" : \"[ ] { }\", \"b\" : [ 1 ] ] }",
+  "expected": { "a": "[ ] { }", "b": [1] }
+}
