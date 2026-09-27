@@ -1,0 +1,5 @@
+{
+  "name": "mismatch plus missing comma — no single edit strictly parses, clean failure (checklist §3 limit)",
+  "input": "{ \"a\" : [ 1 , 2 } \"c\" : 3 }",
+  "expectOk": false
+}
