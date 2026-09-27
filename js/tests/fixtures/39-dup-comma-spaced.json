@@ -1,0 +1,5 @@
+{
+  "name": "whitespace-separated duplicate commas collapse too (checklist §2.4 superset decision)",
+  "input": "{\"a\":1 , , \"b\":2}",
+  "expected": { "a": 1, "b": 2 }
+}
