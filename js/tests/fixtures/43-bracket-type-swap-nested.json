@@ -1,0 +1,5 @@
+{
+  "name": "bracket type mismatch — swap closes a nested container at end of text (checklist §3)",
+  "input": "{ \"a\" : { \"b\" : [ 1 , 2 ] , \"c\" : 3 ] }",
+  "expected": { "a": { "b": [1, 2], "c": 3 } }
+}
