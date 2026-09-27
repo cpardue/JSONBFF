@@ -30,7 +30,7 @@
       grammar-driven passDelimiters design (JSONBFF-IMPROVEMENTS.md §1)
       ships as its own change; until then such input fails with a clear
       error report.
-    ============================================================ */
+   ============================================================ */
 (function (root) {
   'use strict';
 
