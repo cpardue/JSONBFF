@@ -1,0 +1,5 @@
+{
+  "name": "full pipeline interplay — comment + single quotes + unquoted keys + missing comma/colon + missing brace (checklist §2; IMPROVEMENTS §1.3 composition)",
+  "input": "{ // header comment\n  'name': 'JSONBFF',\n  items [ 1 2 ],\n  \"a\": 1 b: 2",
+  "expected": { "name": "JSONBFF", "items": [1, 2], "a": 1, "b": 2 }
+}
