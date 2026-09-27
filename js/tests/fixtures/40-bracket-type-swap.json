@@ -1,0 +1,5 @@
+{
+  "name": "bracket type mismatch — swap wins: closer swapped to match open frame (checklist §3)",
+  "input": "{ \"a\" : { \"b\" : 1 ] , \"c\" : 2 }",
+  "expected": { "a": { "b": 1 }, "c": 2 }
+}
