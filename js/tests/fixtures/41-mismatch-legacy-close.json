@@ -1,0 +1,5 @@
+{
+  "name": "bracket type mismatch — no single edit parses on its own; legacy stray-removal + EOF close (checklist §3)",
+  "input": "{ \"a\" : { \"b\" : [ 1 , 2 }",
+  "expected": { "a": { "b": [1, 2] } }
+}
