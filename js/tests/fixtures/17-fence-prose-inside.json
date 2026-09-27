@@ -1,0 +1,5 @@
+{
+  "name": "prose inside the fence block — fence + prose both stripped (checklist §0)",
+  "input": "```\n{\"a\": 1, \"b\": [2, 3]}\nsome trailing prose\n```",
+  "expected": { "a": 1, "b": [2, 3] }
+}
