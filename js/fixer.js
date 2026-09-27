@@ -55,6 +55,18 @@
       guard. Not repaired (they fail with the clear error report): a LONE
       leading comma ([,1]) and mixed sequences ({ "a", : 1 }) — §2.2
       remainder.
+    - A bracket TYPE mismatch (checklist §3) is resolved by pass 11's
+      two single-edit candidates — swap the closer to match the open
+      frame, or remove it — each certified by a strict JSON.parse of the
+      whole text (the parser itself decides; no guesswork). At most one
+      candidate can ever parse: a swap keeps the outside-string bracket
+      count and a removal lowers it by one, while valid JSON needs
+      exactly one closer per opener. Adoption always makes the whole
+      document parse, so it completes the repair in that round and only
+      fires when no other defect blocks parsing; when neither single
+      edit parses on its own, the mismatch is removed as a stray bracket
+      and still-open brackets are closed at EOF (legacy path), or the
+      clear error report ships.
    ============================================================ */
 (function (root) {
   'use strict';
@@ -291,11 +303,11 @@
           i += 2;
           var close = region.indexOf('*/', i);
           i = close === -1 ? n : close + 2;
-          s += ' ';
           count++;
           continue;
         }
-        s += region.charAt(i++);
+        s += region.charAt(i);
+        i++;
       }
       return s;
     });
@@ -644,13 +656,29 @@
     return { text: out, changes: changes };
   }
 
-  /** Pass 11 — Balance brackets: a closer without a matching open is
-      removed ("stray"); at end-of-text the still-open brackets are
-      closed in reverse order. */
+  /** Pass 11 — Balance brackets (checklist §3): a closer without a
+      matching open is removed ("stray"); at end-of-text the still-open
+      brackets are closed in reverse order. A type mismatch (e.g. `]`
+      when the top frame is `{`) gets the checklist's two single-edit
+      candidates — swap the closer to match the open frame, or remove it
+      — each certified by a strict JSON.parse of the WHOLE text (the
+      parser itself decides; no guesswork). At most one candidate can
+      ever parse: a swap keeps the outside-string bracket count and a
+      removal lowers it by one, while valid JSON needs exactly one
+      closer per opener. The first adoptable position in text order wins
+      and is the ONLY edit this invocation makes (one targeted fix per
+      round, §7) — adoption always makes the whole document parse, so it
+      completes the repair. If no candidate parses on its own, behavior
+      is unchanged from the legacy path: every stray/mismatch closer is
+      removed and still-open brackets are closed at EOF (which may then
+      compose with other passes in later rounds). Candidate tests are
+      capped (MAX_MISMATCH_TESTS strict parses) so a pathological input
+      reaches the legacy path instead of churning. */
   function passBalanceBrackets(text) {
     var spans = mapStrings(text);
     var stack = [];
-    var strayAt = [];
+    var strayAt = [];       // ALL unmatched closer positions (removal list)
+    var mismatchOpen = [];  // parallel: top-frame opener for TYPE mismatches ('' = empty-stack stray)
     for (var k = 0; k <= spans.length; k++) {
       var gs = k === 0 ? 0 : spans[k - 1][1];
       var ge = k < spans.length ? spans[k][0] : text.length;
@@ -659,9 +687,34 @@
         if (c === '{' || c === '[') stack.push(c);
         else if (c === '}' || c === ']') {
           var want = c === '}' ? '{' : '[';
-          if (stack[stack.length - 1] === want) stack.pop();
-          else strayAt.push(i);
+          var top = stack.length ? stack[stack.length - 1] : null;
+          if (top === want) stack.pop();
+          else {
+            strayAt.push(i);
+            mismatchOpen.push(top === null ? '' : top);
+          }
         }
+      }
+    }
+    // Candidate decision for type mismatches ("try both, keep whichever
+    // parses", checklist §3). Swap is tested before removal; the order is
+    // immaterial to correctness (at most one can parse) — swap-first just
+    // prefers keeping the author's bracket count. Empty-stack strays have
+    // no frame to match, so removal only, exactly as the legacy path did.
+    var MAX_MISMATCH_TESTS = 32;
+    var tested = 0;
+    for (var m = 0; m < mismatchOpen.length && tested < MAX_MISMATCH_TESTS; m++) {
+      if (!mismatchOpen[m]) continue;
+      var mi = strayAt[m];
+      var swapText = text.slice(0, mi) + (mismatchOpen[m] === '{' ? '}' : ']') + text.slice(mi + 1);
+      tested++;
+      if (attemptParse(swapText).ok) {
+        return { text: swapText, changes: [{ key: 'swapped', count: 1 }] };
+      }
+      var rmText = text.slice(0, mi) + text.slice(mi + 1);
+      tested++;
+      if (attemptParse(rmText).ok) {
+        return { text: rmText, changes: [{ key: 'stray', count: 1 }] };
       }
     }
     var changes = [];
@@ -699,7 +752,7 @@
     passPyLiterals,      // 8
     passDelimiters,      // 9 (checklist §2 — insert missing commas/colons, grammar-driven)
     passDuplicatePunct,  // 10 (checklist §2.4 — collapse duplicate ,, / :: separators)
-    passBalanceBrackets  // 11
+    passBalanceBrackets  // 11 (checklist §3 — stray removal, mismatch swap/remove candidates, EOF close)
   ];
 
   var LABELS = {
@@ -717,6 +770,7 @@
     dupcomma: function (c) { return c === 1 ? 'collapsed 1 duplicate comma' : 'collapsed ' + c + ' duplicate commas'; },
     dupcolon: function (c) { return c === 1 ? 'collapsed 1 duplicate colon' : 'collapsed ' + c + ' duplicate colons'; },
     stray: function (c) { return c === 1 ? 'removed 1 stray bracket' : 'removed ' + c + ' stray brackets'; },
+    swapped: function (c) { return c === 1 ? 'corrected 1 mismatched bracket' : 'corrected ' + c + ' mismatched brackets'; },
     closed: function (c) { return c === 1 ? 'closed 1 open bracket' : 'closed ' + c + ' open brackets'; }
   };
 
