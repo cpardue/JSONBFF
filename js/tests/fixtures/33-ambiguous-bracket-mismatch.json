@@ -1,0 +1,5 @@
+{
+  "name": "mid-document bracket TYPE mismatch — no guess, clean failure (IMPROVEMENTS §1.5)",
+  "input": "{\"a\": [1, 2} \"b\": 3}",
+  "expectOk": false
+}
