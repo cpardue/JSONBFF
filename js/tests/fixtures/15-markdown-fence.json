@@ -1,0 +1,5 @@
+{
+  "name": "leading markdown code fence stripped (checklist §0)",
+  "input": "```json\n{\n  \"a\": 1,\n  \"b\": [2, 3]\n}\n```",
+  "expected": { "a": 1, "b": [2, 3] }
+}
