@@ -1,0 +1,5 @@
+{
+  "name": "leading fence left unclosed — opening line stripped (checklist §0)",
+  "input": "```json\n{\"a\": 1}",
+  "expected": { "a": 1 }
+}
