@@ -17,14 +17,20 @@
    - Unrecoverable → ok:false with the remaining parse error plus the
      passes already applied; best-effort text kept in `output` (§5.3).
 
-   Known limitation: a bare apostrophe in prose/comments is treated as
-   the start of a single-quoted span (mapStrings supports ' per §5.1).
-   Such input degrades to a clear error report — never a silent wrong
-   result, since passes only run on already-invalid input.
-
-   §5.2 stretch pass 9 ("insert missing commas") intentionally dropped:
-   not provably safe — clear error reporting covers it instead.
-   ============================================================ */
+    Known limitations:
+    - A bare apostrophe in prose/comments is treated as
+      the start of a single-quoted span (mapStrings supports ' per §5.1).
+      Such input degrades to a clear error report — never a silent wrong
+      result, since passes only run on already-invalid input.
+    - Pass 2 wrapper stripping only recognizes a markdown fence when the
+      paste starts with one, and prose containing unbalanced braces/brackets
+      is never sliced away (bracket-free-prose rule) — such input fails
+      with the plain parse error instead.
+    - Missing commas/colons between members are not repaired yet: the
+      grammar-driven passDelimiters design (JSONBFF-IMPROVEMENTS.md §1)
+      ships as its own change; until then such input fails with a clear
+      error report.
+    ============================================================ */
 (function (root) {
   'use strict';
 
@@ -127,7 +133,108 @@
     return count ? { text: t, changes: [{ key: 'normalize', count: count }] } : { text: text, changes: [] };
   }
 
-  /** Pass 2 — Strip // line comments and /* block comments (outside spans). */
+  /** Pass 2 — Strip paste wrappers (checklist §0): a leading markdown
+      code fence (```json … ```, closed or unclosed) and any surrounding
+      prose outside the outermost balanced JSON container. Runs only on
+      already-invalid text, so valid input is untouched (§5.3).
+
+      Prose-slicing policy (conservative by design — no guessing):
+        - slice only when non-blank text surrounds the container region(s)
+          AND that outside text holds no { } [ ] characters — a bracket
+          outside every balanced region is broken structure, not prose;
+        - one balanced region → slice to it; several regions → slice to
+          the leftmost region that already parses as strict JSON; none
+          parse → no edit and the pipeline fails clean with the parse
+          error;
+        - a fence is recognized only when the first non-empty line is a
+          ``` line (see header limitation).
+      Monotone: every edit strictly shrinks the text, so re-rounds see a
+      smaller or identical document — no oscillation. */
+  function passWrapper(text) {
+    var changes = [];
+    var t = text;
+
+    // -- fence: first non-empty line is a ``` line → payload is the block
+    //    content between it and the next ``` line (or to end-of-text when
+    //    the fence was left unclosed).
+    var lines = t.split('\n');
+    var f = -1;
+    for (var li = 0; li < lines.length; li++) {
+      if (lines[li].trim() !== '') { f = li; break; }
+    }
+    if (f !== -1 && lines[f].trim().indexOf('```') === 0) {
+      var c = -1;
+      for (var lj = f + 1; lj < lines.length; lj++) {
+        if (lines[lj].trim().indexOf('```') === 0) { c = lj; break; }
+      }
+      var inner = lines.slice(f + 1, c === -1 ? lines.length : c).join('\n');
+      if (inner.trim() !== '') {
+        t = inner;
+        changes.push({ key: 'fence', count: 1 });
+      }
+    }
+
+    // -- prose: outermost balanced container regions (string-aware walk).
+    var spans = mapStrings(t);
+    var regions = [];
+    var depth = 0;
+    var start = -1;
+    for (var k = 0; k <= spans.length; k++) {
+      var gs = k === 0 ? 0 : spans[k - 1][1];
+      var ge = k < spans.length ? spans[k][0] : t.length;
+      for (var i = gs; i < ge; i++) {
+        var ch = t.charAt(i);
+        if (ch === '{' || ch === '[') {
+          if (depth === 0) start = i;
+          depth++;
+        } else if (ch === '}' || ch === ']') {
+          depth--;
+          if (depth < 0) { depth = 0; start = -1; }
+          else if (depth === 0) { regions.push([start, i + 1]); start = -1; }
+        }
+      }
+    }
+
+    var pick = -1;
+    if (regions.length) {
+      // any non-blank text outside every region? (prefix, gaps, suffix —
+      // regions are disjoint and left-to-right)
+      var outside = false;
+      var outsideHasBracket = false;
+      var ri = 0;
+      for (var p = 0; p < t.length; p++) {
+        while (ri < regions.length && p >= regions[ri][1]) ri++;
+        var covered = ri < regions.length && p >= regions[ri][0] && p < regions[ri][1];
+        if (!covered) {
+          var oc = t.charAt(p);
+          if (!isWs(oc)) {
+            outside = true;
+            if (oc === '{' || oc === '}' || oc === '[' || oc === ']') outsideHasBracket = true;
+          }
+        }
+      }
+      if (outside && !outsideHasBracket) {
+        if (regions.length === 1) {
+          pick = 0;
+        } else {
+          for (var r = 0; r < regions.length && pick === -1; r++) {
+            try {
+              JSON.parse(t.slice(regions[r][0], regions[r][1]));
+              pick = r;
+            } catch (err) { /* region does not parse — try the next */ }
+          }
+        }
+      }
+    }
+    if (pick !== -1) {
+      t = t.slice(regions[pick][0], regions[pick][1]);
+      changes.push({ key: 'prose', count: 1 });
+    }
+
+    return changes.length ? { text: t, changes: changes } : { text: text, changes: [] };
+  }
+
+  /** Pass 3 — Strip // line comments and /* block comments (outside spans). */
   function passComments(text) {
     var spans = mapStrings(text);
     var count = 0;
@@ -156,7 +263,7 @@
     return count ? { text: out, changes: [{ key: 'comments', count: count }] } : { text: text, changes: [] };
   }
 
-  /** Pass 3 — Single-quoted spans → double: swap delimiters, escape any
+  /** Pass 4 — Single-quoted spans → double: swap delimiters, escape any
       inner "; \' (escaped apostrophe) collapses to '. All other escapes
       pass through untouched. */
   function passSingleQuotes(text) {
@@ -193,7 +300,7 @@
     return { text: out, changes: [{ key: 'quotes', count: converted }] };
   }
 
-  /** Pass 4 — Quote unquoted keys after { or , (§5.2 safe heuristic).
+  /** Pass 5 — Quote unquoted keys after { or , (§5.2 safe heuristic).
       Note: replace() callback receives (fullMatch, p1, p2, p3, …). */
   function passUnquotedKeys(text) {
     var spans = mapStrings(text);
@@ -222,7 +329,7 @@
     return null;
   }
 
-  /** Pass 5 — Trailing commas: drop a comma when the next code character
+  /** Pass 6 — Trailing commas: drop a comma when the next code character
       outside spans is } or ]. */
   function passTrailingCommas(text) {
     var spans = mapStrings(text);
@@ -247,7 +354,7 @@
     return { text: out, changes: [{ key: 'trailing', count: removeAt.length }] };
   }
 
-  /** Passes 6/7 helper — replace whole tokens outside spans; a match is
+  /** Passes 7/8 helper — replace whole tokens outside spans; a match is
       skipped when an identifier character touches either side. */
   function wordSwapPass(text, pattern, map, key) {
     var spans = mapStrings(text);
@@ -264,19 +371,19 @@
     return count ? { text: out, changes: [{ key: key, count: count }] } : { text: text, changes: [] };
   }
 
-  /** Pass 6 — Invalid JS literals → null (outside spans). */
+  /** Pass 7 — Invalid JS literals → null (outside spans). */
   function passJsLiterals(text) {
     return wordSwapPass(text, /NaN|-Infinity|Infinity|undefined/g,
       { 'NaN': 'null', '-Infinity': 'null', 'Infinity': 'null', 'undefined': 'null' }, 'jslit');
   }
 
-  /** Pass 7 — Python/other literals (outside spans). */
+  /** Pass 8 — Python/other literals (outside spans). */
   function passPyLiterals(text) {
     return wordSwapPass(text, /True|False|None/g,
       { 'True': 'true', 'False': 'false', 'None': 'null' }, 'pylit');
   }
 
-  /** Pass 8 — Balance brackets: a closer without a matching open is
+  /** Pass 9 — Balance brackets: a closer without a matching open is
       removed ("stray"); at end-of-text the still-open brackets are
       closed in reverse order. */
   function passBalanceBrackets(text) {
@@ -322,17 +429,20 @@
   /* ---------------- pipeline + status messages (§5.1, §4) ------------- */
   var PASSES = [
     passNormalize,       // 1
-    passComments,        // 2
-    passSingleQuotes,    // 3
-    passUnquotedKeys,    // 4
-    passTrailingCommas,  // 5
-    passJsLiterals,      // 6
-    passPyLiterals,      // 7
-    passBalanceBrackets  // 8 (stretch pass 9 dropped — see header)
+    passWrapper,         // 2 (checklist §0 — code fences + surrounding prose)
+    passComments,        // 3
+    passSingleQuotes,    // 4
+    passUnquotedKeys,    // 5
+    passTrailingCommas,  // 6
+    passJsLiterals,      // 7
+    passPyLiterals,      // 8
+    passBalanceBrackets  // 9 (missing-comma/colon pass pending — see header)
   ];
 
   var LABELS = {
     normalize: function (c) { return c === 1 ? 'stripped 1 BOM/line-ending' : 'stripped ' + c + ' BOMs/line-endings'; },
+    fence: function (c) { return c === 1 ? 'stripped 1 markdown code fence' : 'stripped ' + c + ' markdown code fences'; },
+    prose: function (c) { return c === 1 ? 'removed 1 block of surrounding prose' : 'removed ' + c + ' blocks of surrounding prose'; },
     comments: function (c) { return c === 1 ? 'removed 1 comment' : 'removed ' + c + ' comments'; },
     quotes: function (c) { return c === 1 ? 'converted 1 single-quoted string' : 'converted ' + c + ' single-quoted strings'; },
     keys: function (c) { return c === 1 ? 'quoted 1 key' : 'quoted ' + c + ' keys'; },
