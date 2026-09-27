@@ -1,0 +1,5 @@
+{
+  "name": "prose with several containers — leftmost parseable one wins (checklist §0)",
+  "input": "first {\"a\": 1} then [2 3] end",
+  "expected": { "a": 1 }
+}
