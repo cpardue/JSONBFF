@@ -1,0 +1,5 @@
+{
+  "name": "missing commas between array elements — multi-line + adjacent objects (checklist §2)",
+  "input": "[\n  1 2,\n  { \"a\": 1 } { \"b\": 2 }\n]",
+  "expected": [1, 2, { "a": 1 }, { "b": 2 }]
+}
