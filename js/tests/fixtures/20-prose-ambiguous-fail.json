@@ -1,0 +1,5 @@
+{
+  "name": "prose with two unrepairable containers — no guess, clean failure (checklist §0)",
+  "input": "first {a 1} then [2 3] end",
+  "expectOk": false
+}
