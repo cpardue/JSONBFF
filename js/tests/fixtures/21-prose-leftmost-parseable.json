@@ -1,0 +1,5 @@
+{
+  "name": "prose with two containers — the parseable one is kept (checklist §0)",
+  "input": "the {bad} shape was {\"a\": 1}",
+  "expected": { "a": 1 }
+}
