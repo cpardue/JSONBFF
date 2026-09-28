@@ -53,7 +53,7 @@ Checklist:
 
 ## 6. Duplicate keys
 
-- [ ] Not a parse error in most parsers, but flag/dedupe if you want "clean" output — keep last occurrence (matches native JSON.parse behavior)
+- [x] Not a parse error in most parsers, but flag/dedupe if you want "clean" output — keep last occurrence (matches native JSON.parse behavior) — resolved detect-and-report: the success path's JSON.parse → JSON.stringify reserialization already keeps the last value at the key's first position (exactly native semantics); fix() scans the just-parsed text (`countDuplicateKeys`, decoded-key comparison, per object) and reports the dropped occurrences as a `dupkeys` change entry ("removed N duplicate keys") — no in-place removal pass (it could reorder keys relative to the parse). Fixtures 62–66
 
 ## 7. The retry loop (this is the core algorithm)
 
