@@ -21,7 +21,7 @@ Checklist:
 - [x] Parse the error message to extract position N (if present) — `errorDetail()` regexes V8's `at position N`, with `line L column C` and Firefox `lineNumber`/`column` fallbacks
 - [x] Convert N (character offset) into line/column for highlighting — same helper appends "at line L, column C" when the runtime message lacks it (newline-counting fallback from position)
 - [ ] Look at the character at N and a small window before/after it (say ±20 chars) — this tells you what kind of fix to attempt → ships with §8's context snippet in the failure report
-- [ ] If the error is "Unexpected end of JSON input," the problem is almost always an unclosed bracket/brace/string near the end of the document, not at a specific index — handle separately (see §5) → brackets handled (pass 9); the unterminated-string half waits on §4.1
+- [x] If the error is "Unexpected end of JSON input," the problem is almost always an unclosed bracket/brace/string near the end of the document, not at a specific index — handle separately (see §5) → brackets: pass 11 closes still-open ones at EOF; unterminated strings: pass 13 `passUnterminatedStrings` (fixtures 47–48, 51, 53)
 
 ## 2. Structural delimiter fixes
 
@@ -38,11 +38,11 @@ Checklist:
 
 ## 4. String / quote fixes
 
-- [ ] Unterminated string — if a `"` opens a string and no matching unescaped `"` is found before the next structural character (`,`, `}`, `]`) or EOF → insert `"` at the point just before that structural character
+- [x] Unterminated string — if a `"` opens a string and no matching unescaped `"` is found before the next structural character (`,`, `}`, `]`) or EOF → insert `"` at the point just before that structural character — pass 13 `passUnterminatedStrings`: each structural char inside the open span is tried first, left-to-right, first whole-text strict-parse wins (the parser decides; e.g. `{ "a": "x }` closes at the brace in one edit); otherwise close at the end of content (trailing whitespace stays outside the string, an odd dangling backslash run drops). Only code-context spans are closed — a stray `"` in prose fails clean (header limitation). Companion: unterminated `'` spans in code context are converted by pass 4 with content preserved (data-loss bug fixed this run). Fixtures 47–48, 51, 53
 - [x] Single-quoted strings — convert `'...'` to `"..."` (only when not nested inside an already-valid double-quoted string; watch for apostrophes in content) — pass 4 `passSingleQuotes` (fixture 03)
 - [x] Unquoted or bareword keys — `{key: 1}` → wrap key in double quotes — pass 5 `passUnquotedKeys` (fixture 04)
-- [ ] Unescaped inner quotes — a `"` inside a string that isn't the terminator → escape as `\"` (use the stack/position logic from §3 to tell terminator from content)
-- [ ] Unescaped control characters (raw newline/tab inside a string) → escape as `\n`, `\t`, etc.
+- [x] Unescaped inner quotes — a `"` inside a string that isn't the terminator → escape as `\"` (use the stack/position logic from §3 to tell terminator from content) — pass 12 `passInnerQuotes`: only a value-position span (right after `:`) followed by a non-key bare word; for each later quote C it escapes every unescaped `"` strictly between opener and C and keeps the leftmost whole-text strict-parse (parser-certified, §7). Deliberately runs before pass 9 (whose D1 comma insertion would rewrite the trigger shape). Not repaired — clean failure, documented in the fixer.js header: breaks inside array elements or at object-key positions (a bare word there means a missing delimiter, not string content), breaks at quote adjacency (no bare word after the premature close), and strings that are also missing their final closing quote. Fixtures 49, 52; limits 54–55
+- [x] Unescaped control characters (raw newline/tab inside a string) → escape as `\n`, `\t`, etc. — pass 14 `passEscCtrl`: raw U+0000–U+001F → `\b` `\t` `\n` `\f` `\r`, all others as `\u00xx`; existing escape pairs pass through untouched. Runs after pass 13 (so its trailing-whitespace trim sees the raw characters) and before pass 11; valid JSON never contains a raw control char in a span, so it only fires on already-invalid text (§5.3). Fixtures 50, 56
 
 ## 5. Value-token fixes
 
@@ -84,13 +84,13 @@ Ships as fixtures with their fix type (`js/tests/fixtures/`, auto-discovered by 
 |---|---|
 | `{"a":1 "b":2}` — missing comma | fixture 23 ✅ |
 | `{"a":1,}` — trailing comma | fixture 02 ✅ |
-| `{"a":"hello}` — missing closing quote | awaiting §4.1 |
+| `{"a":"hello}` — missing closing quote | fixture 47 ✅ |
 | `{"a":1` — missing closing brace | fixture 06 ✅ (nested variant) |
 | `{'a':1}` — single quotes | fixture 03 ✅ |
 | `{a:1}` — unquoted key | fixture 04 ✅ |
 | `{"a":undefined}` — JS literal | fixture 07 ✅ |
 | `{"a":1,,"b":2}` — double comma | fixture 34 ✅ |
-| `{"a":"line1\nline2"}` with a raw newline instead of `\n` | awaiting §4.5 |
+| `{"a":"line1\nline2"}` with a raw newline instead of `\n` | fixture 50 ✅ |
 | Deeply nested unbalanced brackets | fixture 06 ✅ + 10-disaster ✅ |
 
 The key architectural point: don't try to write one giant regex that fixes everything at once. Use the parser's own error + position as your cursor, fix the single nearest issue, and loop. That's what your current Fix button is likely missing — it's probably applying fixes without re-checking position after each change, so offsets drift and subsequent fixes land in the wrong place.
