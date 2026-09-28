@@ -1,0 +1,5 @@
+{
+  "name": "duplicate object keys — keep last occurrence, at first position (checklist §6)",
+  "input": "{\"a\":1,\"b\":2,\"a\":3}",
+  "expected": { "a": 3, "b": 2 }
+}
