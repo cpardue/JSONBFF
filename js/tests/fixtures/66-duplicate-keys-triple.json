@@ -1,0 +1,5 @@
+{
+  "name": "triple duplicate — two occurrences drop (checklist §6)",
+  "input": "{\"a\":1,\"a\":2,\"a\":3}",
+  "expected": { "a": 3 }
+}
