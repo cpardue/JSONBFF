@@ -18,10 +18,11 @@
      passes already applied; best-effort text kept in `output` (§5.3).
 
     Known limitations:
-    - A bare apostrophe in prose/comments is treated as
-      the start of a single-quoted span (mapStrings supports ' per §5.1).
-      Such input degrades to a clear error report — never a silent wrong
-      result, since passes only run on already-invalid input.
+    - A bare apostrophe in prose is treated as the start of a
+      single-quoted span (mapStrings supports ' per §5.1). An apostrophe
+      span left unterminated to end-of-text is converted only when it opens
+      in code context ({ , : [ or text start) — a prose apostrophe degrades
+      to a clear error report instead, never a silent wrong result (§5.3).
     - Pass 2 wrapper stripping only recognizes a markdown fence when the
       paste starts with one, and prose containing unbalanced braces/brackets
       is never sliced away (bracket-free-prose rule) — such input fails
@@ -67,15 +68,41 @@
       edit parses on its own, the mismatch is removed as a stray bracket
       and still-open brackets are closed at EOF (legacy path), or the
       clear error report ships.
+     - Unescaped inner quotes (checklist §4.4) are repaired by pass 12
+       passInnerQuotes: a terminated "..." span in VALUE position (right
+       after a ':') immediately followed (in code) by a bare word that is NOT
+       a key — no colon after the word — is read as a string that never closed
+       there. For each later quote C, every unescaped " strictly between the
+       opener and C is escaped and the whole-text result is strict-parsed; the
+       leftmost C that parses wins (parser-certified, pass 11's policy). Not
+       repaired (clean error report): breaks inside array elements or at
+       object-key positions (a bare word there means a missing delimiter, not
+       string content), breaks at quote adjacency (no bare word after the
+       premature close), and strings that are ALSO missing their final closing
+       quote.
+     - Unterminated double-quoted strings (checklist §4.1) are closed by
+       pass 13: each structural char ( , } ] ) inside the open span is tried
+       first — insert " just before it, keep whichever whole-text result
+       strict-parses (the checklist's own rule, parser-certified). If none
+       parses, the string is closed at the end of its content: trailing
+       whitespace stays outside the string and an odd dangling backslash run
+       (which cannot escape anything) is dropped. Only spans opening in code
+       context are closed — a stray " in prose degrades to the clean error
+       report instead. Runs before pass 11 so the balance EOF-close cannot
+       land inside the open span.
+     - Raw control characters (U+0000–U+001F) inside strings are escaped by
+       pass 14 to \b \t \n \f \r, others as \u00xx (checklist §4.5).
    ============================================================ */
 (function (root) {
   'use strict';
 
   /* ---------------- shared string-aware scanner (§5.1) ----------------
-     Spans are [start, end) including delimiters; escape-aware for both
-     " and ' delimiters; an unterminated string extends to end-of-text.
-     Transforms act only outside spans, so JSON content containing //,
-     #, brackets or quotes is never mangled (§5.1, §5.3). */
+     Spans are [start, end, terminated] including delimiters; escape-aware
+     for both " and ' delimiters; an unterminated string (terminated false)
+     extends to end-of-text — a span whose closing quote is the last char
+     of the text still reads terminated true. Transforms act only outside
+     spans, so JSON content containing //, #, brackets or quotes is never
+     mangled (§5.1, §5.3). */
   function mapStrings(text) {
     var spans = [];
     var i = 0;
@@ -90,7 +117,7 @@
           j++;
         }
         var end = (j < n) ? j + 1 : n; // unterminated → to end-of-text
-        spans.push([i, end]);
+        spans.push([i, end, j < n]);   // [start, end, terminated]
         i = end;
       } else {
         i++;
@@ -316,7 +343,12 @@
 
   /** Pass 4 — Single-quoted spans → double: swap delimiters, escape any
       inner "; \' (escaped apostrophe) collapses to '. All other escapes
-      pass through untouched. */
+      pass through untouched. An unterminated span (content runs to
+      end-of-text) is converted only when it opens in code context
+      ({ , : [ or text start) — a prose apostrophe is left alone and the
+      document fails with the clean error report (header limitation); its
+      dangling trailing backslash run (odd count) cannot escape anything and
+      is dropped. */
   function passSingleQuotes(text) {
     var spans = mapStrings(text);
     var hasSingle = false;
@@ -331,7 +363,18 @@
       var s = spans[k][0];
       var e = spans[k][1];
       if (text.charAt(s) !== "'") continue;
-      var inner = text.slice(s + 1, e - 1);
+      var unterminated = !spans[k][2];
+      var inner;
+      if (unterminated) {
+        var pc = prevCodeChar(text, spans, s);
+        if (pc !== null && pc !== '{' && pc !== ',' && pc !== ':' && pc !== '[') continue;
+        inner = text.slice(s + 1, e); // no closing delimiter — content runs to end-of-text
+        var be = inner.length;
+        while (be > 0 && inner.charAt(be - 1) === '\\') be--;
+        if ((inner.length - be) % 2 === 1) inner = inner.slice(0, be); // dangling escape
+      } else {
+        inner = text.slice(s + 1, e - 1);
+      }
       var b = '';
       for (var i = 0; i < inner.length; i++) {
         var ch = inner.charAt(i);
@@ -432,6 +475,87 @@
   function passPyLiterals(text) {
     return wordSwapPass(text, /True|False|None/g,
       { 'True': 'true', 'False': 'false', 'None': 'null' }, 'pylit');
+  }
+
+  /** Is the char at index i an escaped quote — odd number of consecutive
+      backslashes immediately before it? (\" is content; \\" is not.) */
+  function escapesAt(text, i) {
+    var n = 0;
+    while (i - 1 - n >= 0 && text.charAt(i - 1 - n) === '\\') n++;
+    return n % 2 === 1;
+  }
+
+  /** Pass 12 — Escape unescaped inner double quotes (checklist §4.4): a
+      TERMINATED "..." span that opens in VALUE position (right after a ':')
+      and is immediately followed (in code, whitespace ignored) by a bare
+      word that is NOT a key — no colon after the word — can only be read as
+      a string that never closed at its apparent end: the closer is content.
+      A span preceded by { , [ is skipped — a bare word after THAT is a
+      missing delimiter (pass 9) or structural nonsense, and merging it into
+      one string would corrupt the document. Repair candidates: every later
+      quote position C (capped), and for each one escape every unescaped "
+      strictly between the opener s and C, so s..C becomes one string; each
+      candidate is certified by a strict JSON.parse of the WHOLE text (the
+      parser itself decides — pass 11's policy) and the leftmost certifying
+      C wins. The no-colon rule keeps this off missing-comma keys (pass 9's
+      job), and the trigger can only fire on already-invalid text, so valid
+      input is untouched (§5.3). Carries pass 9's ambiguous-paste no-guess
+      guard. Not repaired (clean error report): breaks inside array elements
+      or at key positions, breaks at quote adjacency (no bare word after the
+      premature close), and strings that are ALSO missing their final closing
+      quote — all documented in the header. Placed in PASSES before pass 9
+      despite its number: pass 9's D1 insertion would rewrite this trigger
+      shape (a comma inside what was string content). */
+  function passInnerQuotes(text) {
+    // Ambiguous-paste guard — same reasoning as pass 9.
+    var regions = topLevelRegions(text);
+    if (regions.length >= 2) {
+      var gflags = outsideFlags(text, regions);
+      if (gflags.nonBlank && !gflags.hasBracket) return { text: text, changes: [] };
+    }
+
+    var spans = mapStrings(text);
+    var MAX_CANDIDATES = 16;
+    for (var k = 0; k < spans.length; k++) {
+      var s = spans[k][0], e = spans[k][1];
+      if (text.charAt(s) !== '"' || !spans[k][2]) continue; // unterminated → pass 13
+      // VALUE position only: the span must open right after a ':' (an object
+      // value). A span preceded by { , [ is a key or an array element — a bare
+      // word after THAT is a missing delimiter (pass 9's job) or structural
+      // nonsense, and merging it into one string would corrupt the document.
+      if (prevCodeChar(text, spans, s) !== ':') continue;
+      var f = e;
+      while (f < text.length && isWs(text.charAt(f))) f++;
+      if (f >= text.length || !isWordChar(text.charAt(f))) continue;
+      var w1 = f;
+      while (w1 < text.length && isWordChar(text.charAt(w1))) w1++;
+      var g = w1;
+      while (g < text.length && isWs(text.charAt(g))) g++;
+      if (g < text.length && text.charAt(g) === ':') continue; // a key — pass 9's shape
+
+      var q = text.indexOf('"', e + 1);
+      var tried = 0;
+      while (q !== -1 && tried < MAX_CANDIDATES) {
+        tried++;
+        var target = [];
+        for (var p = s + 1; p < q; p++) {
+          if (text.charAt(p) === '"' && !escapesAt(text, p)) target.push(p);
+        }
+        var out = '';
+        var prev = 0;
+        for (var t = 0; t < target.length; t++) {
+          // Insert '\' just before the quote at target[t]; keep the quote.
+          out += text.slice(prev, target[t]) + '\\';
+          prev = target[t];
+        }
+        out += text.slice(prev);
+        if (attemptParse(out).ok) {
+          return { text: out, changes: [{ key: 'innerquote', count: target.length }] };
+        }
+        q = text.indexOf('"', q + 1);
+      }
+    }
+    return { text: text, changes: [] };
   }
 
   /** Pass 9 — Insert missing delimiters (checklist §2; JSONBFF-IMPROVEMENTS.md
@@ -656,6 +780,93 @@
     return { text: out, changes: changes };
   }
 
+  /** Pass 13 — Close unterminated double-quoted strings (checklist §4.1):
+      a " span that mapStrings extends to end-of-text has NO unescaped
+      closer anywhere in the remainder of the document; it is closed by
+      inserting one. Positions tried, in order:
+        1. every structural char ( , } ] ) inside the open span, left to
+           right (capped) — insert " just before it; the FIRST whole-text
+           result that strict-parses wins (the checklist's own rule, same
+           parser-certified policy as pass 11 — e.g. { "a": "x } closes at
+           the brace in one edit);
+        2. otherwise: the end of the span's content — trailing whitespace
+           stays OUTSIDE the string, and an odd dangling backslash run (it
+           cannot escape anything) is dropped.
+      Only a span that opens in code context ({ , : [ or text start) is
+      closed — a stray " in prose degrades to the clean error report
+      (header limitation). The trigger can only fire on already-invalid
+      text, so valid input is untouched (§5.3). Placed in PASSES before
+      pass 11 despite its number: the balance EOF-close would otherwise
+      land INSIDE the open span and corrupt it. */
+  function passUnterminatedStrings(text) {
+    var spans = mapStrings(text);
+    var s = -1;
+    for (var k = 0; k < spans.length; k++) {
+      if (text.charAt(spans[k][0]) === '"' && !spans[k][2]) { s = spans[k][0]; break; }
+    }
+    if (s === -1) return { text: text, changes: [] };
+    var pc = prevCodeChar(text, spans, s);
+    if (pc !== null && pc !== '{' && pc !== ',' && pc !== ':' && pc !== '[') return { text: text, changes: [] };
+
+    var p = text.length;
+    while (p > s + 1 && isWs(text.charAt(p - 1))) p--; // trailing whitespace stays outside
+    var be = p;
+    while (be > s + 1 && text.charAt(be - 1) === '\\') be--;
+    if ((p - be) % 2 === 1) p = be; // odd dangling backslash run — drop it
+
+    var tested = 0;
+    for (var m = s + 1; m < p && tested < 16; m++) {
+      var c = text.charAt(m);
+      if ((c !== ',' && c !== '}' && c !== ']') || escapesAt(text, m)) continue;
+      var cand = text.slice(0, m) + '"' + text.slice(m);
+      if (attemptParse(cand).ok) return { text: cand, changes: [{ key: 'strclose', count: 1 }] };
+      tested++;
+    }
+
+    return { text: text.slice(0, p) + '"' + text.slice(p), changes: [{ key: 'strclose', count: 1 }] };
+  }
+
+  /** Pass 14 — Escape unescaped control characters inside string spans
+      (checklist §4.5): raw U+0000–U+001F → the JSON escapes \b \t \n \f
+      \r, all others as \u00xx. Existing escape pairs pass through
+      untouched. Placed after pass 13 (so its trailing-whitespace trim sees
+      the raw characters) and before pass 11. Valid JSON never contains a
+      raw control character in a span, so this only fires on already-
+      invalid text (§5.3). */
+  function passEscCtrl(text) {
+    var spans = mapStrings(text);
+    var count = 0;
+    var out = '';
+    var last = 0;
+    for (var k = 0; k < spans.length; k++) {
+      var s = spans[k][0], e = spans[k][1];
+      var cEnd = spans[k][2] ? e - 1 : e; // content excludes the closing delimiter (unterminated: to EOF)
+      out += text.slice(last, s + 1);
+      var b = '';
+      for (var i = s + 1; i < cEnd; i++) {
+        var ch = text.charAt(i);
+        if (ch === '\\' && i + 1 < cEnd) { b += ch + text.charAt(i + 1); i++; continue; } // keep existing escape
+        var code = text.charCodeAt(i);
+        if (code < 32) {
+          count++;
+          if (ch === '\b') b += '\\b';
+          else if (ch === '\t') b += '\\t';
+          else if (ch === '\n') b += '\\n';
+          else if (ch === '\f') b += '\\f';
+          else if (ch === '\r') b += '\\r';
+          else { var h = code.toString(16); b += '\\u00' + (h.length < 2 ? '0' : '') + h; }
+          continue;
+        }
+        b += ch;
+      }
+      out += b;
+      if (cEnd < e) out += text.charAt(e - 1); // closing delimiter
+      last = e;
+    }
+    out += text.slice(last);
+    return count ? { text: out, changes: [{ key: 'ctrl', count: count }] } : { text: text, changes: [] };
+  }
+
   /** Pass 11 — Balance brackets (checklist §3): a closer without a
       matching open is removed ("stray"); at end-of-text the still-open
       brackets are closed in reverse order. A type mismatch (e.g. `]`
@@ -750,8 +961,11 @@
     passTrailingCommas,  // 6
     passJsLiterals,      // 7
     passPyLiterals,      // 8
+    passInnerQuotes,     // 12 (checklist §4.4 — early by design: pass 9's D1 would rewrite its trigger shape)
     passDelimiters,      // 9 (checklist §2 — insert missing commas/colons, grammar-driven)
     passDuplicatePunct,  // 10 (checklist §2.4 — collapse duplicate ,, / :: separators)
+    passUnterminatedStrings, // 13 (checklist §4.1 — before balance: the EOF-close must not land inside an open span)
+    passEscCtrl,         // 14 (checklist §4.5 — after 13 so its trailing-ws trim sees raw chars)
     passBalanceBrackets  // 11 (checklist §3 — stray removal, mismatch swap/remove candidates, EOF close)
   ];
 
@@ -771,7 +985,10 @@
     dupcolon: function (c) { return c === 1 ? 'collapsed 1 duplicate colon' : 'collapsed ' + c + ' duplicate colons'; },
     stray: function (c) { return c === 1 ? 'removed 1 stray bracket' : 'removed ' + c + ' stray brackets'; },
     swapped: function (c) { return c === 1 ? 'corrected 1 mismatched bracket' : 'corrected ' + c + ' mismatched brackets'; },
-    closed: function (c) { return c === 1 ? 'closed 1 open bracket' : 'closed ' + c + ' open brackets'; }
+    closed: function (c) { return c === 1 ? 'closed 1 open bracket' : 'closed ' + c + ' open brackets'; },
+    innerquote: function (c) { return c === 1 ? 'escaped 1 unescaped inner quote' : 'escaped ' + c + ' unescaped inner quotes'; },
+    strclose: function (c) { return c === 1 ? 'closed 1 unterminated string' : 'closed ' + c + ' unterminated strings'; },
+    ctrl: function (c) { return c === 1 ? 'escaped 1 raw control character in a string' : 'escaped ' + c + ' raw control characters in strings'; }
   };
 
   function changePhrases(changes) {
