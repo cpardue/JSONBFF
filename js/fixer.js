@@ -8,7 +8,11 @@
    Exposes: JSONBFFFix = { fix }
    API contract consumed by js/app.js (JSONBFF-PLAN.md §4):
      fix(text, indent?) → { ok, output?, message, changes?: [{pass, count}] }
-   - Valid input up front → 0 changes, reformatted output (idempotent).
+   - Valid input up front → no repair passes run; the output is the
+     JSON.stringify reserialization (idempotent). The one change a valid
+     document can ever report is dupkeys — duplicate object keys are
+     deduped natively by that reserialization and flagged so the user
+     sees it (checklist §6).
    - Repair = fixed-order passes (§5.2); JSON.parse is attempted after
      each pass and the pipeline stops at the first success, so no pass
      ever runs on valid input — it cannot change its meaning (§5.3).
@@ -111,6 +115,14 @@
        word could be a mistyped true/false/null, a YAML-style boolean, or
        the intended string, and quoting it would guess which. Such input
        fails clean with the parse error at the word (fixture 60 pins it).
+     - Duplicate object keys (checklist §6) are not edited in place: on
+       success the output is the JSON.stringify reserialization of the
+       parsed value, which keeps the LAST occurrence's value at the key's
+       first position — exactly native JSON.parse behavior. The success
+       path scans the final text and reports how many occurrences drop
+       as a dupkeys change entry (countDuplicateKeys). No text surgery:
+       a removal pass could reorder keys relative to the parse, and the
+       flag is what §6 asks for.
     ============================================================ */
 (function (root) {
   'use strict';
@@ -1099,6 +1111,102 @@
     return changes.length ? { text: out, changes: changes } : { text: text, changes: [] };
   }
 
+  /* Duplicate-key detection (checklist §6) — success path only, over
+     text that has JUST strict-parsed, so it may assume a valid-JSON
+     shape: mapStrings spans are exactly the string literals, brackets
+     balance, and every object key is a "..." span. Counts, per object,
+     how many DIRECT members repeat a key already seen in that same
+     object — keys compare by DECODED value (JSON.parse of the key
+     span), so "\u0061" and "a" are one key, and the same key in two
+     different objects never counts. The return is the number of
+     occurrences the JSON.stringify reserialization in fix() drops
+     (native keep-last: last value wins, at the key's first position) —
+     reported as a dupkeys change entry. No text surgery here: a removal
+     pass could reorder keys relative to the parse and is not needed for
+     "clean" output (§5.3). */
+  function countDuplicateKeys(text) {
+    var spans = mapStrings(text);
+    var n = text.length;
+    var total = 0;
+
+    /** Span containing position i, or null (spans are sorted — the linear
+        scan is the file's convention, cf. nextCodeChar). */
+    function spanAt(i) {
+      for (var k = 0; k < spans.length; k++) {
+        if (i >= spans[k][0] && i < spans[k][1]) return spans[k];
+        if (spans[k][0] > i) break;
+      }
+      return null;
+    }
+
+    function skipWs(p) {
+      while (p < n && isWs(text.charAt(p))) p++;
+      return p;
+    }
+
+    /** Position just past the value starting at p: one string span, a
+        balanced container, or a scalar that in valid JSON can never
+        contain , } ]. */
+    function skipValue(p) {
+      var sp = spanAt(p);
+      if (sp) return sp[1];
+      var c = text.charAt(p);
+      if (c === '{' || c === '[') {
+        var depth = 1;
+        p++;
+        while (depth > 0) {
+          var s2 = spanAt(p);
+          if (s2) { p = s2[1]; continue; }
+          var d = text.charAt(p);
+          if (d === '{' || d === '[') depth++;
+          else if (d === '}' || d === ']') depth--;
+          p++;
+        }
+        return p;
+      }
+      while (p < n) {
+        var sc = text.charAt(p);
+        if (sc === ',' || sc === '}' || sc === ']') break;
+        p++;
+      }
+      return p;
+    }
+
+    /** The object whose '{' sits at openPos: visit its DIRECT members
+        only (nested containers are skipped whole by skipValue) and count
+        every direct key repeated within this object. Bails without
+        counting when the shape is unexpected — unreachable on text that
+        just strict-parsed, but it must never guess. */
+    function countObject(openPos) {
+      var seen = Object.create(null);
+      var p = skipWs(openPos + 1);
+      if (text.charAt(p) === '}') return; // empty object
+      for (;;) {
+        var sp = spanAt(p);
+        if (!sp || text.charAt(p) !== '"') break;
+        var key;
+        try { key = JSON.parse(text.slice(p, sp[1])); } catch (err) { break; }
+        p = skipWs(sp[1]);
+        if (text.charAt(p) !== ':') break;
+        p = skipValue(skipWs(p + 1));
+        if (seen[key]) total++;
+        else seen[key] = true;
+        p = skipWs(p);
+        if (text.charAt(p) !== ',') break; // '}' ends the object (valid JSON)
+        p++;
+      }
+    }
+
+    for (var k = 0; k <= spans.length; k++) {
+      var gs = k === 0 ? 0 : spans[k - 1][1];
+      var ge = k < spans.length ? spans[k][0] : n;
+      for (var i = gs; i < ge; i++) {
+        if (text.charAt(i) === '{') countObject(i); // every object, at every depth — each counted once
+      }
+    }
+    return total;
+  }
+
   /* ---------------- pipeline + status messages (§5.1, §4) ------------- */
   var PASSES = [
     passNormalize,       // 1
@@ -1138,7 +1246,8 @@
     closed: function (c) { return c === 1 ? 'closed 1 open bracket' : 'closed ' + c + ' open brackets'; },
     innerquote: function (c) { return c === 1 ? 'escaped 1 unescaped inner quote' : 'escaped ' + c + ' unescaped inner quotes'; },
     strclose: function (c) { return c === 1 ? 'closed 1 unterminated string' : 'closed ' + c + ' unterminated strings'; },
-    ctrl: function (c) { return c === 1 ? 'escaped 1 raw control character in a string' : 'escaped ' + c + ' raw control characters in strings'; }
+    ctrl: function (c) { return c === 1 ? 'escaped 1 raw control character in a string' : 'escaped ' + c + ' raw control characters in strings'; },
+    dupkeys: function (c) { return c === 1 ? 'removed 1 duplicate key' : 'removed ' + c + ' duplicate keys'; }
   };
 
   function changePhrases(changes) {
@@ -1185,6 +1294,12 @@
     }
 
     if (parsed.ok) {
+      // §6 — duplicate object keys: the reserialization below already
+      // dedupes them natively (keep-last); count how many occurrences
+      // drop so the user sees it. `current` is exactly the text that
+      // just strict-parsed, which countDuplicateKeys requires.
+      var dupKeys = countDuplicateKeys(current);
+      if (dupKeys) changes.push({ key: 'dupkeys', count: dupKeys });
       var space = indent;
       if (!(typeof space === 'string' || (typeof space === 'number' && space > 0))) space = 2;
       var message;
