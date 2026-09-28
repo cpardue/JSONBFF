@@ -1,0 +1,5 @@
+{
+  "name": "unterminated single-quoted string in code context — converted, content preserved (checklist §4.1 companion, pass 4 fix)",
+  "input": "{ 'a': 'b",
+  "expected": { "a": "b" }
+}
