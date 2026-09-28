@@ -3,8 +3,12 @@
    JSON BFF — test runner (plain Node, zero dependencies)
 
    JSONBFF-PLAN.md §5.4: reads every file in fixtures/; each fixture is
-   { "name", "input", "expected"?, "expectOk"?, "expectNoChanges"? }.
+   { "name", "input", "expected"?, "expectOk"?, "expectNoChanges"?,
+     "expectMessage"? }.
    `input` may contain invalid JSON — it's just a string field.
+   expectMessage (optional, either branch) requires the returned message to
+   CONTAIN the substring — pins stable parts of reports whose exact wording
+   is runtime-dependent (fixer.js §8.2 context snippets).
 
    Run: node js/tests/run-tests.js   (exit 0 = all green)
 
@@ -82,6 +86,11 @@ files.forEach(function (file) {
       problems.push('expected clean failure (ok:false + message), got ok=' + JSON.stringify(r && r.ok) +
                     ' message=' + JSON.stringify(r && r.message));
     }
+    if (r !== undefined && typeof fx.expectMessage === 'string' &&
+        (r.message || '').indexOf(fx.expectMessage) === -1) {
+      problems.push('message missing ' + JSON.stringify(fx.expectMessage) +
+                    '\n         got: ' + JSON.stringify(r.message));
+    }
   } else if (fx.expected !== undefined) {
     var ok;
     try {
@@ -116,6 +125,10 @@ files.forEach(function (file) {
         if (again !== undefined && (again.ok !== true || sumEdits(again) !== 0)) {
           problems.push('not idempotent on its own output (ok=' + JSON.stringify(again && again.ok) +
                         ', edits=' + (again ? sumEdits(again) : '?') + ')');
+        }
+        if (typeof fx.expectMessage === 'string' && (ok.message || '').indexOf(fx.expectMessage) === -1) {
+          problems.push('message missing ' + JSON.stringify(fx.expectMessage) +
+                        '\n         got: ' + JSON.stringify(ok.message));
         }
       }
     }
