@@ -20,7 +20,7 @@ Checklist:
 
 - [x] Parse the error message to extract position N (if present) — `errorDetail()` regexes V8's `at position N`, with `line L column C` and Firefox `lineNumber`/`column` fallbacks
 - [x] Convert N (character offset) into line/column for highlighting — same helper appends "at line L, column C" when the runtime message lacks it (newline-counting fallback from position)
-- [ ] Look at the character at N and a small window before/after it (say ±20 chars) — this tells you what kind of fix to attempt → ships with §8's context snippet in the failure report
+- [x] Look at the character at N and a small window before/after it (say ±20 chars) — this tells you what kind of fix to attempt → shipped inside §8's failure report: `contextSnippet()` shows the error line (marked `>`, caret under the exact column) plus enough neighbor lines that ≥20 chars on each side of the anchor are visible (capped), and minified one-line input gets an ~80-char window centered on the column. Fixtures 70–72 pin it
 - [x] If the error is "Unexpected end of JSON input," the problem is almost always an unclosed bracket/brace/string near the end of the document, not at a specific index — handle separately (see §5) → brackets: pass 11 closes still-open ones at EOF; unterminated strings: pass 13 `passUnterminatedStrings` (fixtures 47–48, 51, 53)
 
 ## 2. Structural delimiter fixes
@@ -73,8 +73,8 @@ while not valid and attempts < MAX_ATTEMPTS:
 
 ## 8. Fallback tier
 
-- [ ] If targeted patching fails, fall back to a permissive parse (JSON5-style: tolerates comments, trailing commas, unquoted keys, single quotes) and re-serialize with strict `JSON.stringify` — this alone fixes most real-world "almost JSON" input in one shot and is a good first thing to try before your manual patcher, honestly
-- [ ] If that also fails, report the exact line/column and a snippet of context so the user can fix it by hand
+- [x] If targeted patching fails, fall back to a permissive parse (JSON5-style: tolerates comments, trailing commas, unquoted keys, single quotes) and re-serialize with strict `JSON.stringify` — `permissiveParse()`: recursive descent tolerating exactly those four constructs (each meaning-preserving), everything else strict (JSON numbers, one top-level value, nothing after; ASCII identifier keys only — `{ 1: 2 }` / `{ my-key: 1 }` still fail clean). Runs AFTER the pipeline (the item's own condition) over the pre-processed ORIGINAL (passes 1–2 only — surgical passes can be lossy); success reports a `json5` change entry and strict-reserializes. Classic rescue: comments containing quote characters, which start fake spans in mapStrings and defeat the span-based passes (fixtures 67–69 success, 70 negative pin; header limits list what still fails)
+- [x] If that also fails, report the exact line/column and a snippet of context so the user can fix it by hand — failure message now cites the ORIGINAL input's first strict error (`parseErrorPosition`: V8 `at position N` / `(line L column C)`, Firefox `lineNumber`/`column`, else the token named in new V8's quoted-window message located inside that window, else end-of-text) and appends a multi-line context snippet; `.status--error` renders pre-wrap + monospace so the caret line stays aligned. Fixtures 70–72
 
 ## 9. Testing checklist (once implemented)
 
