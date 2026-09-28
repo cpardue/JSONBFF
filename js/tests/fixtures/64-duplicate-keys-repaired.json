@@ -1,0 +1,5 @@
+{
+  "name": "duplicates flagged on the repaired path too — missing comma fixed first (checklist §6)",
+  "input": "{\"a\":1 \"a\":2,\"b\":3}",
+  "expected": { "a": 2, "b": 3 }
+}
