@@ -1,0 +1,6 @@
+{
+  "name": "block comment full of quotes + single-quoted key + unquoted key + trailing comma (checklist §8.1)",
+  "input": "{ /* user's \"profile\" */\n  'displayName': \"Ann O'Hara\",\n  age: 30,\n}",
+  "expected": { "displayName": "Ann O'Hara", "age": 30 },
+  "expectMessage": "permissive"
+}
