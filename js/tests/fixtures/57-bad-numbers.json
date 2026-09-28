@@ -1,0 +1,5 @@
+{
+  "name": "malformed numbers — leading plus, leading zeros, trailing dot, bare fraction, negative variants (checklist §5)",
+  "input": "{ \"a\": +42, \"b\": 007, \"c\": 5., \"d\": .5, \"e\": [0123, -.25, 1e+3, 1e007], \"f\": -00.75 }",
+  "expected": { "a": 42, "b": 7, "c": 5, "d": 0.5, "e": [123, -0.25, 1000, 10000000], "f": -0.75 }
+}
