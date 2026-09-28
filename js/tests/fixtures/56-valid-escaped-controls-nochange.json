@@ -1,0 +1,6 @@
+{
+  "name": "valid JSON with already-escaped control characters — never touched (checklist §4.5, §5.3)",
+  "input": "{\"a\":\"line1\\nline2\"}",
+  "expected": { "a": "line1\nline2" },
+  "expectNoChanges": true
+}
