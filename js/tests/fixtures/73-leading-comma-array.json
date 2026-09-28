@@ -1,0 +1,6 @@
+{
+  "name": "stray leading comma right after [ (the orders-batch shape) — dropped, no data invented (checklist §10)",
+  "input": "{\n  \"name\": \"orders-batch\",\n  \"count\": 3,\n  \"items\": [,\n    {\n      \"id\": 1,\n      \"status\": \"ok\"\n    },\n    {\n      \"id\": 2,\n      \"status\": null\n    },\n    {\n      \"id\": 3,\n      \"status\": null\n    }\n  ]\n}",
+  "expected": { "name": "orders-batch", "count": 3, "items": [ { "id": 1, "status": "ok" }, { "id": 2, "status": null }, { "id": 3, "status": null } ] },
+  "expectMessage": "removed 1 stray leading comma"
+}
