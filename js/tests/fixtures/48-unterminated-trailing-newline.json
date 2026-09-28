@@ -1,0 +1,5 @@
+{
+  "name": "unterminated string with trailing newline — quote lands after content, newline stays outside (checklist §4.1)",
+  "input": "{ \"a\" : \"b\n",
+  "expected": { "a": "b" }
+}
