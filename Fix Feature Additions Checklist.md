@@ -48,8 +48,8 @@ Checklist:
 
 - [x] Replace JS-only literals with JSON equivalents: `undefined` → remove key or use null; `NaN`/`Infinity` → null or string — pass 7 `passJsLiterals` maps them all to `null` (fixtures 07, 10)
 - [x] Strip JS-style comments (`// ...` and `/* ... */`) — not valid JSON but common in pasted config — pass 3 `passComments` (fixture 05)
-- [ ] Fix numbers: strip leading `+`, strip leading zeros (`007` → `7`), strip trailing `.` (`5.` → `5`), add leading zero to `.5` → `0.5`
-- [ ] Normalize NaN-like unquoted words that were meant to be strings (e.g. `value: yes` → `"yes"`) — lower priority, ambiguous
+- [x] Fix numbers: strip leading `+`, strip leading zeros (`007` → `7`), strip trailing `.` (`5.` → `5`), add leading zero to `.5` → `0.5` — pass 15 `passNumbers`: whole-token rewrite only, when the token reads as exactly one such typo end-to-end AND both raw neighbors are clean boundaries (identifier-like `007x` / `1..2` / `--5` fail clean); exponent material never touched (`1e+5`, `1e007` valid — untouched). Fixtures 57, 59–61
+- [x] Normalize NaN-like unquoted words that were meant to be strings (e.g. `value: yes` → `"yes"`) — resolved as a documented limitation (fixer.js header): no provably-safe mapping exists (a bare value word could be a mistyped literal, a YAML-style boolean, or the intended string — quoting would guess which), so such input fails clean at the word; fixture 60 pins the behavior
 
 ## 6. Duplicate keys
 
