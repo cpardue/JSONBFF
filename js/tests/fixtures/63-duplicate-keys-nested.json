@@ -1,0 +1,5 @@
+{
+  "name": "nested duplicates counted per object; same key in sibling objects never counts (checklist §6)",
+  "input": "{\"x\":{\"k\":1,\"k\":2},\"y\":{\"k\":9},\"z\":[{\"d\":5},{\"d\":6}]}",
+  "expected": { "x": { "k": 2 }, "y": { "k": 9 }, "z": [ { "d": 5 }, { "d": 6 } ] }
+}
