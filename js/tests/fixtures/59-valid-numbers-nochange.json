@@ -1,0 +1,6 @@
+{
+  "name": "valid tricky numbers — 0, -123.456e-2, 0e5, 1e+5, 1E-5, big int — never touched (checklist §5 invariant)",
+  "input": "{ \"a\": 0, \"b\": -123.456e-2, \"c\": 0e5, \"d\": 1e+5, \"e\": 1E-5, \"f\": 123.456, \"g\": 9007199254740991 }",
+  "expectNoChanges": true,
+  "expected": { "a": 0, "b": -1.23456, "c": 0, "d": 100000, "e": 0.00001, "f": 123.456, "g": 9007199254740991 }
+}
