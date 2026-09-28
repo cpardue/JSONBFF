@@ -245,7 +245,11 @@ select:focus-visible {
 }
 .status--info  { border-left-color: var(--accent); color: var(--info); }
 .status--ok    { border-left-color: var(--ok); color: var(--ok); }
-.status--error { border-left-color: var(--error); color: var(--error); }
+/* .status--error gets pre-wrap + monospace because fix() failure messages
+   embed a multi-line context snippet (fixer.js §8.2) whose caret line must
+   render aligned; white-space: normal would collapse it to a run-on string.
+   Single-line error statuses are visually unaffected by pre-wrap. */
+.status--error { border-left-color: var(--error); color: var(--error); white-space: pre-wrap; word-break: break-word; font-family: var(--mono); }
 .status--warn  { border-left-color: #d97706; color: var(--warn); }
 
 /* ---------- footer ---------- */
