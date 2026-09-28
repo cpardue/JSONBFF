@@ -1,0 +1,5 @@
+{
+  "name": "unterminated string over a structural char — close-before-closer candidate parses first (checklist §4.1 rule)",
+  "input": "{ \"a\" : \"x }",
+  "expected": { "a": "x " }
+}
