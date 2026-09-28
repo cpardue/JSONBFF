@@ -1,0 +1,6 @@
+{
+  "name": "apostrophe inside a line comment defeats the span-based passes — permissive fallback recovers (checklist §8.1)",
+  "input": "{ // don't\n \"a\": 1 }",
+  "expected": { "a": 1 },
+  "expectMessage": "permissive"
+}
