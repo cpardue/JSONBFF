@@ -18,8 +18,12 @@
      ever runs on valid input — it cannot change its meaning (§5.3).
      Passes are monotone, so re-rounding until a round changes nothing
      (or parsing succeeds) always terminates.
-   - Unrecoverable → ok:false with the remaining parse error plus the
-     passes already applied; best-effort text kept in `output` (§5.3).
+   - Unrecoverable by the passes → one permissive (JSON5-style) fallback
+     parse over the pre-processed input (checklist §8.1); success → a
+     strict-reserialized output with a json5 change entry. If that fails
+     too → ok:false citing the ORIGINAL input's first strict error plus
+     line/column and a context snippet around the exact character (§8.2,
+     with §1's ±20-char window); best-effort text kept in `output` (§5.3).
 
     Known limitations:
     - A bare apostrophe in prose is treated as the start of a
@@ -123,6 +127,40 @@
        as a dupkeys change entry (countDuplicateKeys). No text surgery:
        a removal pass could reorder keys relative to the parse, and the
        flag is what §6 asks for.
+      - Permissive fallback (checklist §8.1): when the repair pipeline
+        exhausts its rounds, permissiveParse re-reads the pre-processed
+        ORIGINAL text (BOM/fence/prose stripped via passes 1-2 only — the
+        surgical passes may have mangled their own intermediate) with a
+        recursive-descent JSON5-style parser that tolerates exactly four
+        non-strict constructs, each meaning-preserving: line and block
+        comments (skipped), trailing commas (dropped), single-quoted
+        strings ('x' reads as "x" — JSON escape rules, \' collapsed to '),
+        and unquoted identifier keys (the ASCII set pass 5 quotes; the
+        identifier itself is the property name). Everything else stays
+        strict: JSON numbers, double-quoted strings, true/false/null, one
+        top-level value, nothing after it. The classic rescue: comments
+        containing QUOTE characters — a ' or " inside a comment starts a
+        fake span in mapStrings that swallows the rest of the document, so
+        the span-based passes mangle such input while a real parser models
+        comments as opaque text (fixtures 67-69). Still not repaired
+        (clean failure): numeric keys ({ 1: 2 }), key characters outside
+        the identifier set ({ my-key: 1 } — no JSON5 identifier holds '-'),
+        bare words in VALUE position (see above), non-JSON numbers,
+        unicode-only identifiers, multiple top-level values, and trailing
+        junk after the value. Recursion depth is stack-bounded: a runaway
+        document throws out of permissiveParse, fix() catches it and
+        reports the fallback as failed — no hang, no guess (§5.3).
+      - Failure report (checklist §8.2, carrying §1's ±20-char window):
+        the message cites the FIRST strict error on the ORIGINAL input —
+        coordinates must match what the user pasted, not a mangled
+        intermediate — with line/column from parseErrorPosition (V8 "at
+        position N" / "(line L column C)", Firefox lineNumber/column, else
+        the token named in new V8's quoted-window message located inside
+        that window, else end-of-text for "Unexpected end of JSON input").
+        contextSnippet appends the error line (marked '>', caret under the
+        exact column) plus enough neighbor lines for at least 20 chars on
+        each side of the anchor (capped), with long lines horizontally
+        windowed to ~80 chars centered on the column.
     ============================================================ */
 (function (root) {
   'use strict';
@@ -184,12 +222,26 @@
     catch (err) { return { ok: false, error: err }; }
   }
 
-  /** "<error message> at line L, column C" — regex V8 position/line-col,
-      Firefox lineNumber/column props, newline-counting fallback (same
-      approach as js/formatter.js; duplicated to keep this file
-      self-contained). No duplicate location when the runtime message
-      already carries one. */
-  function errorDetail(text, err) {
+  /** 1-based { line, col } of character offset `off` in `text`. */
+  function lineColOf(text, off) {
+    var o = Math.max(0, Math.min(off, text.length));
+    var line = 1;
+    var lineStart = 0;
+    for (var i = 0; i < o; i++) {
+      if (text.charCodeAt(i) === 10) { line++; lineStart = i + 1; }
+    }
+    return { line: line, col: o - lineStart + 1 };
+  }
+
+  /** { pos, line, col } (all non-null) from a JSON.parse error. Sources,
+      in order: V8 message parts ("at position N", "(line L column C)"),
+      Firefox-style err.lineNumber/err.column properties, then the quoted
+      window newer V8 embeds instead of a position —
+      Unexpected token '}', "<window>" is not valid JSON — where the window
+      (or its elision-free pieces) is located in `text` and anchored at the
+      unexpected token the message names. Last resort: end of text
+      ("Unexpected end of JSON input" points at the end, checklist §1). */
+  function parseErrorPosition(text, err) {
     var msg = (err && err.message) ? String(err.message) : String(err);
     var pos = null, line = null, col = null;
     var lc = /line (\d+) column (\d+)/.exec(msg);
@@ -200,19 +252,121 @@
       line = err.lineNumber;
       if (Number.isInteger(err.column)) col = err.column;
     }
-    if (pos != null && line == null && text.length) {
-      var off = Math.min(pos, text.length);
-      line = 1;
-      var lineStart = 0;
-      for (var i = 0; i < off; i++) {
-        if (text.charCodeAt(i) === 10) { line++; lineStart = i + 1; }
-      }
-      col = off - lineStart + 1;
+    if (pos != null && line == null) {
+      var lc2 = lineColOf(text, pos);
+      line = lc2.line; col = lc2.col;
     }
-    if (line != null && col != null && !/line \d+ column \d+/.test(msg)) {
-      msg += ' at line ' + line + ', column ' + col;
+    if (pos == null && line != null && col != null) {
+      // runtime gave line/column but no offset — scan to it
+      var l2 = 1, s2 = 0;
+      for (var j = 0; j < text.length && l2 < line; j++) {
+        if (text.charCodeAt(j) === 10) l2++;
+      }
+      if (l2 >= line) pos = j + Math.max(0, col - 1);
+    }
+    if (pos == null) {
+      // New V8 quoted-window shape: anchor the named token inside the
+      // window (or its longest elision-free piece found in the text).
+      var tok = /Unexpected token '([^']*)'/.exec(msg);
+      var a = msg.indexOf("', \"");
+      var b = msg.lastIndexOf('\" is not valid JSON');
+      if (tok && tok[1] && a !== -1 && b > a + 4) {
+        var win = msg.slice(a + 4, b);
+        var pieces = win.split('...');
+        for (var k = 0; k < pieces.length; k++) {
+          var piece = pieces[k];
+          if (!piece) continue;
+          var ix = piece.indexOf(tok[1]);
+          var at = text.indexOf(piece);
+          if (at !== -1 && ix !== -1) { pos = at + ix; break; }
+        }
+      }
+    }
+    if (pos == null) pos = text.length;
+    if (line == null || col == null) {
+      var lc3 = lineColOf(text, pos);
+      if (line == null) line = lc3.line;
+      if (col == null) col = lc3.col;
+    }
+    return { pos: Math.max(0, Math.min(pos, text.length)), line: line, col: col };
+  }
+
+  /** "<error message> at line L, column C" — position from
+      parseErrorPosition (same approach as js/formatter.js; duplicated to
+      keep this file self-contained). No duplicate location when the
+      runtime message already carries one. */
+  function errorDetail(text, err) {
+    var msg = (err && err.message) ? String(err.message) : String(err);
+    if (!/line \d+ column \d+/.test(msg)) {
+      var pc = parseErrorPosition(text, err);
+      msg += ' at line ' + pc.line + ', column ' + pc.col;
     }
     return msg;
+  }
+
+  function spaces(n) {
+    var s = '';
+    while (s.length < n) s += ' ';
+    return s;
+  }
+
+  /** Multi-line context snippet around an error position (checklist §1
+      ±20-char window, delivered with the §8.2 failure report): the error
+      line marked '>' with a caret under the exact column, plus enough
+      neighbor lines that at least 20 chars of text on each side of the
+      anchor are visible (capped at 4 extra lines per side) — short-line
+      documents show a real neighborhood, minified one-line documents show
+      an ~80-char window centered on the column. Long lines are
+      horizontally windowed without ellipses (the caret must stay aligned).
+      Display-only sanitation: \r dropped, other raw control chars escaped
+      as \u00xx (escapes shift displayed width, so the caret then aims at
+      the original column minus any escapes before it). Never throws — the
+      position is clamped to the text. */
+  function contextSnippet(text, pc) {
+    var lines = text.split('\n');
+    var total = lines.length;
+    var L = Math.max(1, Math.min(pc.line || 1, total));
+    var col = Math.max(1, pc.col || 1);
+
+    var lo = L, hi = L;
+    var before = col - 1;
+    var after = lines[L - 1].length - col + 1;
+    var up = 0;
+    while (before < 20 && lo > 1 && up < 4) { lo--; before += lines[lo - 1].length + 1; up++; }
+    var down = 0;
+    while (after < 20 && hi < total && down < 4) { hi++; after += lines[hi - 1].length + 1; down++; }
+
+    var MAXL = 80;
+    var el = lines[L - 1];
+    var S = 0;
+    if (el.length > MAXL) S = Math.max(0, Math.min(el.length - MAXL, col - 32));
+
+    function esc(s) {
+      var out = '';
+      for (var i = 0; i < s.length; i++) {
+        var c = s.charAt(i);
+        if (c === '\r') continue;
+        var code = s.charCodeAt(i);
+        if (code < 32) {
+          var h = code.toString(16);
+          out += '\\u00' + (h.length < 2 ? '0' : '') + h;
+        } else {
+          out += c;
+        }
+      }
+      return out;
+    }
+
+    var digits = String(total).length;
+    function gut(num, mark) { return mark + spaces(digits - String(num).length) + num + ' | '; }
+
+    var head = 'Around the error, ' + (lo === hi ? 'line ' + lo : 'lines ' + lo + '-' + hi) + ' of ' + total + ':';
+    var out = [head];
+    for (var li = lo; li <= hi; li++) {
+      out.push(gut(li, li === L ? '> ' : '  ') + esc(lines[li - 1].slice(S, S + MAXL)));
+    }
+    out.push('   ' + spaces(digits) + ' | ' + spaces(Math.max(0, col - 1 - S)) + '^');
+    return out.join('\n');
   }
 
   /* ---------------- passes (§5.2, fixed order) ----------------
@@ -1207,6 +1361,202 @@
     return total;
   }
 
+  /* Permissive (JSON5-style) fallback parse (checklist §8.1). Recursive
+     descent over the raw text, tolerating exactly four non-strict
+     constructs — comments, trailing commas, single-quoted strings, and
+     unquoted identifier keys — everything else stays strict JSON (JSON
+     numbers, double-quoted strings, true/false/null, ONE top-level value,
+     nothing after it). Every tolerance is meaning-preserving: comments are
+     skipped, a trailing comma is dropped, 'x' decodes exactly like "x"
+     under the JSON escape rules (\' collapses to '), and a bare key IS the
+     identifier — so a successful parse re-serializes to unambiguous strict
+     JSON with no guessing. Runs only after the repair pipeline failed, and
+     only over the pre-processed ORIGINAL text (BOM/fence/prose stripped —
+     passes 1-2, the safe ones; the surgical passes may have mangled their
+     intermediate, which is discarded). Classic rescue: comments containing
+     QUOTE characters, which start fake spans in mapStrings and defeat the
+     span-based passes (header limitation, fixtures 67-69). Still rejected
+     (clean failure): numeric keys { 1: 2 }, non-identifier key characters
+     { my-key: 1 }, bare words in VALUE position, non-JSON numbers,
+     unicode-only identifiers, multiple top-level values, trailing junk.
+     Returns { ok:true, value, deviations } or { ok:false }; throws only on
+     runaway recursion depth, which fix() catches as a failed fallback. */
+  function permissiveParse(text) {
+    var n = text.length;
+    var p = 0;
+    var deviations = 0;
+
+    function fail(at) {
+      var err = new Error('Permissive parse failed at position ' + (at == null ? p : at));
+      err.pos = at == null ? p : at;
+      throw err;
+    }
+    function ch(i) { return i < n ? text.charAt(i) : ''; }
+
+    /** Skip whitespace AND comments (comments are one of the four
+        tolerated constructs — counted). An unterminated block comment runs
+        to end-of-text; the following value check then fails cleanly. */
+    function ws() {
+      while (p < n) {
+        var c = ch(p);
+        if (c === ' ' || c === '\t' || c === '\n' || c === '\r') p++;
+        else if (c === '/' && ch(p + 1) === '/') {
+          while (p < n && ch(p) !== '\n') p++;
+          deviations++;
+        }
+        else if (c === '/' && ch(p + 1) === '*') {
+          var q = text.indexOf('*/', p + 2);
+          p = q === -1 ? n : q + 2;
+          deviations++;
+        }
+        else break;
+      }
+    }
+
+    /** One string: p sits on the opening quote; returns its decoded value.
+        Double-quoted → decoded by JSON.parse of the exact span (strict
+        JSON escape rules). Single-quoted → JSON5: same escapes, plus \'
+        collapsing to ', with unescaped " left as content; re-wrapped and
+        decoded by JSON.parse so the browser's own decoder stays the source
+        of truth. Unterminated span or an escape JSON itself rejects
+        (raw line terminator, bad escape pair) → fail. */
+    function string(single) {
+      var start = p;
+      p++;
+      var end = -1;
+      while (p < n) {
+        var c = ch(p);
+        if (c === '\\') { p += 2; continue; }
+        if (c === (single ? "'" : '"')) { end = p; break; }
+        p++;
+      }
+      if (end === -1) fail(start);
+      p = end + 1; // advance past the closing quote
+      var value;
+      try {
+        if (!single) {
+          value = JSON.parse(text.slice(start, end + 1));
+        } else {
+          var inner = '';
+          for (var i = start + 1; i < end; i++) {
+            var d = text.charAt(i);
+            if (d === '\\') {
+              var nx = text.charAt(i + 1);
+              inner += (nx === "'") ? "'" : (d + nx);
+              i++;
+              continue;
+            }
+            inner += (d === '"') ? '\\"' : d;
+          }
+          value = JSON.parse('"' + inner + '"');
+        }
+      } catch (err) { fail(start); }
+      if (single) deviations++;
+      return value;
+    }
+
+    /** true | false | null — exact literal with a clean right boundary;
+        any other bare word in VALUE position fails (no guess, header). */
+    function wordValue() {
+      var lits = ['true', 'false', 'null'];
+      for (var k = 0; k < 3; k++) {
+        if (text.substr(p, lits[k].length) === lits[k] && !isWordChar(ch(p + lits[k].length))) {
+          p += lits[k].length;
+          return lits[k] === 'true' ? true : (lits[k] === 'false' ? false : null);
+        }
+      }
+      fail(p);
+    }
+
+    function number() {
+      // Strict JSON number grammar only — pass 15's own classifier; the
+      // fallback never REPAIRS numbers (that is a surgical-pass job).
+      var t = scanNumberToken(text, p, n);
+      if (!t.ok) fail(p);
+      var v = Number(text.slice(p, t.end));
+      p = t.end;
+      return v;
+    }
+
+    /** A property name: "..." | '...' | an ASCII identifier (the same set
+        pass 5 quotes). Digits do not start identifiers, so numeric keys
+        fail clean — JSON5 agrees. */
+    function key() {
+      var c = ch(p);
+      if (c === '"') return string(false);
+      if (c === "'") return string(true);
+      if (isWordChar(c) && !(c >= '0' && c <= '9')) {
+        var s = p;
+        while (p < n && isWordChar(ch(p))) p++;
+        deviations++;
+        return text.slice(s, p);
+      }
+      fail(p);
+    }
+
+    function value() {
+      ws();
+      var c = ch(p);
+      if (c === '"') return string(false);
+      if (c === "'") return string(true);
+      if (c === '{') return obj();
+      if (c === '[') return arr();
+      if (c === '-' || (c >= '0' && c <= '9')) return number();
+      if (isWordChar(c)) return wordValue();
+      fail(p);
+    }
+
+    function obj() {
+      var o = {};
+      p++; // consume {
+      ws();
+      if (ch(p) === '}') { p++; return o; }
+      for (;;) {
+        ws();
+        var k = key();
+        ws();
+        if (ch(p) !== ':') fail(p);
+        p++;
+        o[k] = value(); // duplicate keys: last wins, exactly native semantics
+        ws();
+        var c = ch(p);
+        if (c === ',') {
+          p++;
+          ws();
+          if (ch(p) === '}') { deviations++; p++; return o; } // trailing comma
+          continue;
+        }
+        if (c === '}') { p++; return o; }
+        fail(p);
+      }
+    }
+
+    function arr() {
+      var a = [];
+      p++; // consume [
+      ws();
+      if (ch(p) === ']') { p++; return a; }
+      for (;;) {
+        a.push(value());
+        ws();
+        var c = ch(p);
+        if (c === ',') {
+          p++;
+          ws();
+          if (ch(p) === ']') { deviations++; p++; return a; } // trailing comma
+          continue;
+        }
+        if (c === ']') { p++; return a; }
+        fail(p);
+      }
+    }
+
+    var v = value();
+    ws();
+    if (p !== n) fail(p); // trailing junk — strict like JSON.parse
+    return { ok: true, value: v, deviations: deviations };
+  }
+
   /* ---------------- pipeline + status messages (§5.1, §4) ------------- */
   var PASSES = [
     passNormalize,       // 1
@@ -1247,7 +1597,9 @@
     innerquote: function (c) { return c === 1 ? 'escaped 1 unescaped inner quote' : 'escaped ' + c + ' unescaped inner quotes'; },
     strclose: function (c) { return c === 1 ? 'closed 1 unterminated string' : 'closed ' + c + ' unterminated strings'; },
     ctrl: function (c) { return c === 1 ? 'escaped 1 raw control character in a string' : 'escaped ' + c + ' raw control characters in strings'; },
-    dupkeys: function (c) { return c === 1 ? 'removed 1 duplicate key' : 'removed ' + c + ' duplicate keys'; }
+    dupkeys: function (c) { return c === 1 ? 'removed 1 duplicate key' : 'removed ' + c + ' duplicate keys'; },
+    json5: function (c) { return c === 1 ? 'tolerated 1 non-strict construct via the permissive (JSON5-style) fallback parse'
+                                        : 'tolerated ' + c + ' non-strict constructs via the permissive (JSON5-style) fallback parse'; }
   };
 
   function changePhrases(changes) {
@@ -1273,6 +1625,10 @@
     }
     var current = text;
     var parsed = attemptParse(current);
+    // §8.2 — the failure report anchors on the FIRST strict error of the
+    // ORIGINAL input (coordinates must match what the user pasted, not a
+    // pass-produced intermediate).
+    var firstError = parsed.ok ? null : parsed.error;
     var changes = [];
     // Rounds of the fixed-order passes. Passes are monotone, but cap the
     // rounds anyway: a logic bug must fail clean, never hang the tab.
@@ -1314,12 +1670,44 @@
       return { ok: true, output: JSON.stringify(parsed.value, null, space), message: message, changes: changes };
     }
 
+    /* §8.1 — permissive fallback, one shot: over the pre-processed
+       ORIGINAL text (safe passes 1-2 only — the surgical passes may have
+       mangled `current`, which is discarded; a recovery must read the
+       user's document, not the wreckage). Never reached on valid input
+       (§5.3); a throw (runaway recursion) counts as a failed fallback. */
+    var fbChanges = [];
+    var pre = passNormalize(text);
+    if (pre.changes.length) fbChanges = fbChanges.concat(pre.changes);
+    pre = passWrapper(pre.text);
+    if (pre.changes.length) fbChanges = fbChanges.concat(pre.changes);
+    var pp = { ok: false };
+    try { pp = permissiveParse(pre.text); } catch (err) { pp = { ok: false }; }
+    if (pp.ok) {
+      fbChanges.push({ key: 'json5', count: pp.deviations });
+      var fSpace = indent;
+      if (!(typeof fSpace === 'string' || (typeof fSpace === 'number' && fSpace > 0))) fSpace = 2;
+      var fEdits = totalEdits(fbChanges);
+      return {
+        ok: true,
+        output: JSON.stringify(pp.value, null, fSpace),
+        message: '🔧 Fixed ' + fbChanges.length + (fbChanges.length === 1 ? ' issue: ' : ' issues: ') +
+                 changePhrases(fbChanges) + ' (' + fEdits + (fEdits === 1 ? ' edit' : ' edits') + ').',
+        changes: fbChanges
+      };
+    }
+
+    /* §8.2 — clean failure with the exact location and a context snippet,
+       so the user can fix it by hand (best-effort repaired text stays in
+       `output`; the snippet reads the ORIGINAL input it cites). */
     var phrases = changePhrases(changes);
+    var pc = parseErrorPosition(text, firstError);
     return {
       ok: false,
       output: current,
-      message: '✗ Could not fully fix — ' + errorDetail(current, parsed.error) + '.' +
-               (phrases ? ' Repaired so far: ' + phrases + '.' : ' No safe repair matched.'),
+      message: '✗ Could not fully fix — ' + errorDetail(text, firstError) + '.' +
+               (phrases ? ' Repaired so far: ' + phrases + '.' : ' No safe repair matched.') +
+               ' The permissive (JSON5-style) fallback parse failed too.' +
+               '\n' + contextSnippet(text, pc),
       changes: changes
     };
   }
