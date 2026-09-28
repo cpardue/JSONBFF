@@ -1,0 +1,5 @@
+{
+  "name": "1..2 does not read as one number typo — no edit, clean failure (checklist §5 limit)",
+  "input": "{ \"a\": 1..2 }",
+  "expectOk": false
+}
