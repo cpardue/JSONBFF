@@ -1,0 +1,5 @@
+{
+  "name": "raw control characters inside strings — escaped to \\n / \\t (checklist §4.5 + §9 raw-newline row)",
+  "input": "{\"a\":\"line1\nline2\",\"t\":\"x\ty\"}",
+  "expected": { "a": "line1\nline2", "t": "x\ty" }
+}
