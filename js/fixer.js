@@ -92,7 +92,26 @@
        land inside the open span.
      - Raw control characters (U+0000–U+001F) inside strings are escaped by
        pass 14 to \b \t \n \f \r, others as \u00xx (checklist §4.5).
-   ============================================================ */
+     - Malformed numbers (checklist §5) are repaired by pass 15
+       passNumbers: a code-context token that reads as exactly ONE numeric
+       typo end-to-end is rewritten to the unique valid JSON number it can
+       mean — a leading + dropped (+5 → 5), integer leading zeros stripped
+       (007 → 7, -00.25 → -0.25), a trailing dot without fraction digits
+       dropped (5. → 5), or a missing integer part zeroed (.5 → 0.5); all
+       four may combine in one token (+007. → 7). Exponent material is
+       copied verbatim (signs inside 1e+5; leading zeros there are valid
+       JSON — 1e007), so a token already matching the JSON number grammar
+       is skipped and valid input can never change (§5.3). Not repaired
+       (clean error report): runs that do not read as one such typo —
+       1..2 (could be 1.2 or two values), identifier-like 007x, double
+       signs --5, a bare . — and any token whose raw neighbor is an
+       identifier character (pass 9's no-guess policy).
+     - Unquoted bare words in VALUE position ({ "a": yes }) are NOT quoted
+       (checklist §5 remainder): no provably-safe mapping exists — the
+       word could be a mistyped true/false/null, a YAML-style boolean, or
+       the intended string, and quoting it would guess which. Such input
+       fails clean with the parse error at the word (fixture 60 pins it).
+    ============================================================ */
 (function (root) {
   'use strict';
 
@@ -475,6 +494,135 @@
   function passPyLiterals(text) {
     return wordSwapPass(text, /True|False|None/g,
       { 'True': 'true', 'False': 'false', 'None': 'null' }, 'pylit');
+  }
+
+  /** Pass 15 — Repair malformed number tokens (checklist §5): a token in
+      code context that reads as exactly ONE numeric typo end-to-end is
+      rewritten to the unique valid JSON number it can mean — a leading `+`
+      dropped (+5 → 5), integer leading zeros stripped (007 → 7, -00.25 →
+      -0.25), a trailing dot with no fraction digits dropped (5. → 5), or
+      a missing integer part zeroed (.5 → 0.5); all four may combine in
+      one token (+007. → 7). Exponent material is copied verbatim — signs
+      inside 1e+5 and leading zeros there (1e007 is valid JSON) — so a
+      token that already matches the JSON number grammar is skipped: valid
+      input can never change (§5.3). A token is edited only when both raw
+      neighbors are clean boundaries (text start/end, or on the left
+      whitespace / { [ , : and on the right whitespace / , } ] :), so
+      identifier-looking runs (007x, 1..2, --5) fail clean instead of
+      being guessed (pass 9's no-guess policy). Carries the standard
+      ambiguous-paste guard (checklist §0). One scan records every fix in
+      original-text coordinates and applies them at the end — a fix only
+      ever canonicalizes a token to a shape the scanner then reads as
+      valid, so re-rounds never re-fire on their own output (monotone). */
+  function passNumbers(text) {
+    // Ambiguous-paste guard — same reasoning as pass 9.
+    var regions = topLevelRegions(text);
+    if (regions.length >= 2) {
+      var gflags = outsideFlags(text, regions);
+      if (gflags.nonBlank && !gflags.hasBracket) return { text: text, changes: [] };
+    }
+
+    var spans = mapStrings(text);
+    var edits = []; // [start, end, replacement] — disjoint, in text order
+    for (var k = 0; k <= spans.length; k++) {
+      var gs = k === 0 ? 0 : spans[k - 1][1];
+      var ge = k < spans.length ? spans[k][0] : text.length;
+      var i = gs;
+      while (i < ge) {
+        var c = text.charAt(i);
+        var starts = (c >= '0' && c <= '9') ||
+          (c === '.' && text.charAt(i + 1) >= '0' && text.charAt(i + 1) <= '9') ||
+          ((c === '+' || c === '-') &&
+            (text.charAt(i + 1) >= '0' && text.charAt(i + 1) <= '9' ||
+             (text.charAt(i + 1) === '.' && text.charAt(i + 2) >= '0' && text.charAt(i + 2) <= '9')));
+        if (!starts) { i++; continue; }
+        var s0 = i;
+        var t = scanNumberToken(text, s0, ge);
+        i = t.end; // walk past the whole token — valid or not, never rescan inside it
+        if (t.ok || t.fixed === text.slice(s0, t.end)) continue; // already canonical
+        var before = s0 > 0 ? text.charAt(s0 - 1) : null;
+        if (before !== null && !isWs(before) &&
+            before !== '{' && before !== '[' && before !== ',' && before !== ':') continue;
+        var after = t.end < text.length ? text.charAt(t.end) : null;
+        if (after !== null && !isWs(after) &&
+            after !== ',' && after !== '}' && after !== ']' && after !== ':') continue;
+        edits.push([s0, t.end, t.fixed]);
+      }
+    }
+    if (!edits.length) return { text: text, changes: [] };
+    var out = '';
+    var prev = 0;
+    for (var r = 0; r < edits.length; r++) {
+      out += text.slice(prev, edits[r][0]) + edits[r][2];
+      prev = edits[r][1];
+    }
+    out += text.slice(prev);
+    return { text: out, changes: [{ key: 'number', count: edits.length }] };
+  }
+
+  /** Scan one number-ish token starting at index i (region end ge caps the
+      walk) → { end, ok, fixed }. `ok` is true when the token already
+      matches the JSON number grammar — -?(0|[1-9]digits)(.digits)?
+      ([eE][+-]?digits)? — and it is then never edited (a leading + is the
+      one sign the grammar rejects). Otherwise `fixed` is the unique
+      rewrite from the four allowed typos (leading +, integer leading
+      zeros, trailing dot without fraction digits, missing integer part).
+      A trailing dot is read INTO the token only when followed by a clean
+      right boundary; otherwise the token ends before it, so 1..2 stays
+      unfixable garbage for the clean error report. */
+  function scanNumberToken(text, i, ge) {
+    var j = i;
+    var sign = '';
+    if (text.charAt(j) === '+' || text.charAt(j) === '-') { sign = text.charAt(j); j++; }
+    var intStart = j, intLen = 0;
+    while (j < ge && text.charAt(j) >= '0' && text.charAt(j) <= '9') { intLen++; j++; }
+    var dotAt = -1, fracStart = -1, fracLen = 0;
+    if (j < ge && text.charAt(j) === '.') {
+      if (text.charAt(j + 1) >= '0' && text.charAt(j + 1) <= '9') {
+        dotAt = j;
+        fracStart = j + 1;
+        j++;
+        while (j < ge && text.charAt(j) >= '0' && text.charAt(j) <= '9') { fracLen++; j++; }
+      } else if (isNumberEndAfter(text, j + 1)) {
+        dotAt = j; // trailing dot — part of the token so it can be dropped
+        j++;
+      }
+    }
+    var expStart = -1, expEnd = -1;
+    if (j < ge && (text.charAt(j) === 'e' || text.charAt(j) === 'E')) {
+      var e = j + 1;
+      if (e < ge && (text.charAt(e) === '+' || text.charAt(e) === '-')) e++;
+      if (e < ge && text.charAt(e) >= '0' && text.charAt(e) <= '9') {
+        while (e < ge && text.charAt(e) >= '0' && text.charAt(e) <= '9') e++;
+        expStart = j;
+        expEnd = e;
+        j = e;
+      }
+    }
+    var canonicalInt = intLen > 0 &&
+      (intLen === 1 || text.charAt(intStart) !== '0');
+    var ok = sign !== '+' && canonicalInt && (dotAt === -1 || fracLen > 0);
+    var fixed = '';
+    if (!ok) {
+      if (sign === '-') fixed += '-';
+      if (intLen > 0) {
+        var m = 0;
+        while (m < intLen - 1 && text.charAt(intStart + m) === '0') m++;
+        fixed += text.slice(intStart + m, intStart + intLen);
+      } else {
+        fixed += '0';
+      }
+      if (dotAt !== -1 && fracLen > 0) fixed += '.' + text.slice(fracStart, fracStart + fracLen);
+      if (expStart !== -1) fixed += text.slice(expStart, expEnd);
+    }
+    return { end: j, ok: ok, fixed: fixed };
+  }
+
+  /** Clean right boundary for a number token ending before index i: text
+      end, or whitespace / , } ] : — the same set pass 15's caller checks. */
+  function isNumberEndAfter(text, i) {
+    var c = text.charAt(i);
+    return c === '' || isWs(c) || c === ',' || c === '}' || c === ']' || c === ':';
   }
 
   /** Is the char at index i an escaped quote — odd number of consecutive
@@ -961,6 +1109,7 @@
     passTrailingCommas,  // 6
     passJsLiterals,      // 7
     passPyLiterals,      // 8
+    passNumbers,         // 15 (checklist §5 — malformed number tokens: +5, 007, 5., .5)
     passInnerQuotes,     // 12 (checklist §4.4 — early by design: pass 9's D1 would rewrite its trigger shape)
     passDelimiters,      // 9 (checklist §2 — insert missing commas/colons, grammar-driven)
     passDuplicatePunct,  // 10 (checklist §2.4 — collapse duplicate ,, / :: separators)
@@ -979,6 +1128,7 @@
     trailing: function (c) { return c === 1 ? 'removed 1 trailing comma' : 'removed ' + c + ' trailing commas'; },
     jslit: function (c) { return c === 1 ? 'replaced 1 invalid literal' : 'replaced ' + c + ' invalid literals'; },
     pylit: function (c) { return c === 1 ? 'replaced 1 Python-style literal' : 'replaced ' + c + ' Python-style literals'; },
+    number: function (c) { return c === 1 ? 'fixed 1 malformed number' : 'fixed ' + c + ' malformed numbers'; },
     comma: function (c) { return c === 1 ? 'inserted 1 missing comma' : 'inserted ' + c + ' missing commas'; },
     colon: function (c) { return c === 1 ? 'inserted 1 missing colon' : 'inserted ' + c + ' missing colons'; },
     dupcomma: function (c) { return c === 1 ? 'collapsed 1 duplicate comma' : 'collapsed ' + c + ' duplicate commas'; },
