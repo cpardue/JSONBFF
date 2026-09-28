@@ -1,0 +1,5 @@
+{
+  "name": "inner quotes in an ARRAY element — value-position rule declines, clean failure (checklist §4.4 limit)",
+  "input": "[ \"He said \"hi\"\" ]",
+  "expectOk": false
+}
