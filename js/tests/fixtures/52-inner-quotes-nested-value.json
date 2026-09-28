@@ -1,0 +1,5 @@
+{
+  "name": "inner quotes in a nested object value — leftmost certifying closer wins (checklist §4.4)",
+  "input": "{\"outer\":{\"msg\":\"It's \"fine\" ok\"},\"n\":1}",
+  "expected": { "outer": { "msg": "It's \"fine\" ok" }, "n": 1 }
+}
