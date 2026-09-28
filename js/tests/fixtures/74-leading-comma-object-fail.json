@@ -1,0 +1,6 @@
+{
+  "name": "stray comma right after { (object) — array-only rule declines to guess, clean failure (checklist §10 limit)",
+  "input": "{ , \"a\": 1 }",
+  "expectOk": false,
+  "expectMessage": "Around the error, line 1 of 1"
+}
