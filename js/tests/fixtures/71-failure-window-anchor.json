@@ -1,0 +1,6 @@
+{
+  "name": "missing value with a positionless V8 error — quoted-window token anchor lands on the closer (checklist §8.2)",
+  "input": "{ \"a\": 1, \"b\": }",
+  "expectOk": false,
+  "expectMessage": "column 16"
+}
