@@ -1,0 +1,5 @@
+{
+  "name": "garbage word after a complete value string — no inner-quote interpretation, clean failure (checklist §4.4 limit)",
+  "input": "{\"a\":\"x\" garbage}",
+  "expectOk": false
+}
