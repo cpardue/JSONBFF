@@ -1,0 +1,6 @@
+{
+  "name": "missing value on a later line — snippet spans the neighborhood, caret at the closer (checklist §8.2)",
+  "input": "{\n  \"server\": \"prod\",\n  \"replicas\": \n}",
+  "expectOk": false,
+  "expectMessage": "Around the error, lines 2-4 of 4"
+}
