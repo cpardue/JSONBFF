@@ -92,5 +92,10 @@ Ships as fixtures with their fix type (`js/tests/fixtures/`, auto-discovered by 
 | `{"a":1,,"b":2}` — double comma | fixture 34 ✅ |
 | `{"a":"line1\nline2"}` with a raw newline instead of `\n` | fixture 50 ✅ |
 | Deeply nested unbalanced brackets | fixture 06 ✅ + 10-disaster ✅ |
+| `"items": [, … ]` — stray leading comma in array | fixture 73 ✅ |
 
 The key architectural point: don't try to write one giant regex that fixes everything at once. Use the parser's own error + position as your cursor, fix the single nearest issue, and loop. That's what your current Fix button is likely missing — it's probably applying fixes without re-checking position after each change, so offsets drift and subsequent fixes land in the wrong place.
+
+## 10. Stray leading comma (arrays)
+
+- [x] Drop a comma that sits directly after `[` (whitespace between allowed) — pass 16 `passLeadingCommas`: region-local scan within one code region (no span jumps — `nextCodeChar` skips string spans, which would misfire on `[ "x" , …]` where a value separates the bracket from the comma); deletion is the only reading in any dialect (JSON5 rejects leading commas too) and invents no data — the strict re-parse after every pass certifies it like all the others; all occurrences in one call, spans that shadow a pattern settle in later rounds. Deliberate limit: objects are out of scope — `{ , "a": 1 }` fails clean (the boundary pin); a mid-array empty element is always spelled with adjacent commas and is already the §2.4 duplicate-comma case (pass 10). Fixtures 73 (success, the orders-batch shape) + 74 (limit)
