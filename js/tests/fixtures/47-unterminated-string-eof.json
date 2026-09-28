@@ -1,0 +1,5 @@
+{
+  "name": "unterminated string at EOF — closed in place, then the brace closes (checklist §4.1 + §9 missing-closing-quote row)",
+  "input": "{\"a\":\"hello}",
+  "expected": { "a": "hello" }
+}
