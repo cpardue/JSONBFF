@@ -1557,6 +1557,43 @@
     return { ok: true, value: v, deviations: deviations };
   }
 
+  /** Pass 16 — Leading comma: drop a comma sitting directly after `[`
+      (whitespace between is fine) within the SAME code region (§10). A
+      comma there has no valid reading in any dialect we accept (JSON5
+      rejects leading commas too), so deletion — never value invention —
+      is the only meaning-preserving repair; the strict re-parse after
+      every pass certifies it like all the others. The scan is
+      region-local by design: nextCodeChar skips string spans, but
+      `[ "x" , …]` has a VALUE between the [ and the comma and must not
+      fire (a span in between means it is not a leading comma). Objects
+      are deliberately out of scope — `{ , "a": 1 }` keeps its clean
+      failure; fixture 74 pins that boundary. A mid-array empty element
+      is always spelled with adjacent commas and is the §2.4
+      duplicate-comma case, already covered by pass 10. */
+  function passLeadingCommas(text) {
+    var spans = mapStrings(text);
+    var removeAt = [];
+    for (var k = 0; k <= spans.length; k++) {
+      var gs = k === 0 ? 0 : spans[k - 1][1];
+      var ge = k < spans.length ? spans[k][0] : text.length;
+      for (var i = gs; i < ge; i++) {
+        if (text.charAt(i) !== '[') continue;
+        var j = i + 1;
+        while (j < ge && isWs(text.charAt(j))) j++;
+        if (j < ge && text.charAt(j) === ',') removeAt.push(j);
+      }
+    }
+    if (!removeAt.length) return { text: text, changes: [] };
+    var out = '';
+    var prev = 0;
+    for (var r = 0; r < removeAt.length; r++) {
+      out += text.slice(prev, removeAt[r]);
+      prev = removeAt[r] + 1;
+    }
+    out += text.slice(prev);
+    return { text: out, changes: [{ key: 'leading', count: removeAt.length }] };
+  }
+
   /* ---------------- pipeline + status messages (§5.1, §4) ------------- */
   var PASSES = [
     passNormalize,       // 1
@@ -1573,7 +1610,8 @@
     passDuplicatePunct,  // 10 (checklist §2.4 — collapse duplicate ,, / :: separators)
     passUnterminatedStrings, // 13 (checklist §4.1 — before balance: the EOF-close must not land inside an open span)
     passEscCtrl,         // 14 (checklist §4.5 — after 13 so its trailing-ws trim sees raw chars)
-    passBalanceBrackets  // 11 (checklist §3 — stray removal, mismatch swap/remove candidates, EOF close)
+    passBalanceBrackets, // 11 (checklist §3 — stray removal, mismatch swap/remove candidates, EOF close)
+    passLeadingCommas    // 16 (checklist §10 — stray leading comma in arrays: `[ ,` → `[`)
   ];
 
   var LABELS = {
@@ -1584,6 +1622,7 @@
     quotes: function (c) { return c === 1 ? 'converted 1 single-quoted string' : 'converted ' + c + ' single-quoted strings'; },
     keys: function (c) { return c === 1 ? 'quoted 1 key' : 'quoted ' + c + ' keys'; },
     trailing: function (c) { return c === 1 ? 'removed 1 trailing comma' : 'removed ' + c + ' trailing commas'; },
+    leading: function (c) { return c === 1 ? 'removed 1 stray leading comma' : 'removed ' + c + ' stray leading commas'; },
     jslit: function (c) { return c === 1 ? 'replaced 1 invalid literal' : 'replaced ' + c + ' invalid literals'; },
     pylit: function (c) { return c === 1 ? 'replaced 1 Python-style literal' : 'replaced ' + c + ' Python-style literals'; },
     number: function (c) { return c === 1 ? 'fixed 1 malformed number' : 'fixed ' + c + ' malformed numbers'; },
