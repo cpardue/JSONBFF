@@ -1,0 +1,5 @@
+{
+  "name": "unquoted bare word in value position — no provably-safe mapping, clean failure (checklist §5 remainder)",
+  "input": "{ \"a\": yes, \"b\": 1 }",
+  "expectOk": false
+}
