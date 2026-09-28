@@ -1,0 +1,5 @@
+{
+  "name": "duplicate keys compare by decoded value, not raw spelling (checklist §6)",
+  "input": "{\"\\u0061b\":1,\"ab\":2}",
+  "expected": { "ab": 2 }
+}
