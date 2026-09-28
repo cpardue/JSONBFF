@@ -1,0 +1,6 @@
+{
+  "name": "key character outside the identifier set (hyphen) — pipeline and permissive fallback both decline to guess (checklist §8.1 limit)",
+  "input": "{ my-key: 1 }",
+  "expectOk": false,
+  "expectMessage": "Around the error, line 1 of 1"
+}
