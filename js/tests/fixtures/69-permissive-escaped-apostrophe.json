@@ -1,0 +1,6 @@
+{
+  "name": "comment apostrophe + single-quoted value with escaped apostrophe + trailing comma (checklist §8.1)",
+  "input": "{ // TODO: user's field\n  \"name\": 'Ann O\\'Hara',\n}",
+  "expected": { "name": "Ann O'Hara" },
+  "expectMessage": "permissive"
+}
