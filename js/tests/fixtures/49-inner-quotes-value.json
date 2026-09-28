@@ -1,0 +1,5 @@
+{
+  "name": "unescaped inner quotes in a value string — parser-certified escape (checklist §4.4)",
+  "input": "{\"a\":\"He said \"hi\"\"}",
+  "expected": { "a": "He said \"hi\"" }
+}
