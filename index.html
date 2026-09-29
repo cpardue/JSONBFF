@@ -69,7 +69,7 @@
     crossorigin="anonymous"></script>
   -->
 
-  <!-- =====================================================================
+  <!-- ===============================
        WEBMCP origin trial (JSONBFF-PLAN.md §12) — fill in after deploy (§8).
        The WebMCP API (document.modelContext) is in Chrome/Edge origin
        trials; js/webmcp.js is a silent no-op without it, so the site works
@@ -190,7 +190,11 @@
   <!-- Core actions (JSONBFF-PLAN.md §10). Load before app.js, which reads
        window.JSONBFFFormat / window.JSONBFFFix when the buttons are clicked. -->
   <script src="js/formatter.js"></script>
-  <script src="js/fixer.js"></script>
+  <!-- fixer.js lives in three classic scripts (a/b/c): the single module,
+       split only to fit a ~38 KB per-file push cap — see their headers -->
+  <script src="js/fixer-a.js"></script>
+  <script src="js/fixer-b.js"></script>
+  <script src="js/fixer-c.js"></script>
   <script src="js/webmcp.js"></script>
   <script src="js/app.js"></script>
 </body>
