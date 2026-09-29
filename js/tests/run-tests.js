@@ -20,8 +20,9 @@
        is idempotent); expectNoChanges additionally requires the first
        fix to report 0 changes (valid input, §5.3 hard rule).
 
-   The runner loads js/fixer.js with fs + vm exactly like a browser
-   classic <script> would execute it (JSONBFF-PLAN.md §2) — no
+   The runner loads js/fixer-a.js + js/fixer-b.js + js/fixer-c.js (the three
+   classic scripts that together ARE fixer.js — see their headers) with fs +
+   vm exactly like a browser would execute the <script> tags — no
    packaging layer, ever.
    ============================================================ */
 'use strict';
@@ -32,13 +33,15 @@ var vm = require('vm');
 var util = require('util');
 
 function loadFixer() {
-  var src = fs.readFileSync(path.join(__dirname, '..', 'fixer.js'), 'utf8');
+  var parts = ['fixer-a.js', 'fixer-b.js', 'fixer-c.js'];
   var sandbox = { console: console };
   sandbox.window = sandbox; // classic-script global target
   vm.createContext(sandbox);
-  vm.runInContext(src, sandbox, { filename: 'fixer.js' });
+  parts.forEach(function (f) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox, { filename: f });
+  });
   if (!sandbox.JSONBFFFix || typeof sandbox.JSONBFFFix.fix !== 'function') {
-    throw new Error('fixer.js did not expose JSONBFFFix.fix');
+    throw new Error('fixer part scripts did not expose JSONBFFFix.fix');
   }
   return sandbox.JSONBFFFix;
 }
@@ -180,7 +183,7 @@ function buildAppEnv(search) {
     addEventListener: function (t, fn) { docListeners.push([t, fn]); }
   };
   vm.createContext(sandbox);
-  ['formatter.js', 'fixer.js', 'app.js'].forEach(function (f) {
+  ['formatter.js', 'fixer-a.js', 'fixer-b.js', 'fixer-c.js', 'app.js'].forEach(function (f) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox, { filename: f });
   });
   return { els: els, docListeners: docListeners, copied: copied };
@@ -327,7 +330,7 @@ function click(env, id) { var h = env.els[id]._ls.click; if (h) h(); }
   var robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, 'utf8') : '';
   var smMatch = /Sitemap:\s*(\S+)/i.exec(robots);
   check('static: robots.txt allows all crawlers and names a sitemap',
-    !!robots && /User-agent:\s*\*/.test(robots) && /Allow:\s*\//.test(robots) && !!smMatch,
+    !!robots && /User-agent:\s*\*/.test(robots) && /Allow:\s*\/\.test(robots) && !!smMatch,
     'robots.txt: ' + JSON.stringify(robots.slice(0, 160)));
   if (smMatch) {
     var smFile = smMatch[1].replace(/^https?:\/\/[^/]+\/?/, '').split('/').pop();
@@ -372,7 +375,7 @@ function buildWebMcpEnv() {
     }
   };
   vm.createContext(sandbox);
-  ['formatter.js', 'fixer.js', 'webmcp.js'].forEach(function (f) {
+  ['formatter.js', 'fixer-a.js', 'fixer-b.js', 'fixer-c.js', 'webmcp.js'].forEach(function (f) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox, { filename: f });
   });
   return registered;
