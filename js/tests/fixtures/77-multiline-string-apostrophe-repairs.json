@@ -1,0 +1,6 @@
+{
+  "name": "legit multi-line string containing an apostrophe — §11 pre-check declines (neither one-char repair parses), pass 14 escapes the raw newline as before (checklist §11 limit)",
+  "input": "{ \"a\": \"don't\n, ok\" }",
+  "expected": { "a": "don't\n, ok" },
+  "expectMessage": "escaped 1 raw control character"
+}
