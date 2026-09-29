@@ -1,0 +1,6 @@
+{
+  "name": "mismatched closing quote with a unique parseable repair — backslash before the ' makes only the swap certify; quotefix applies (checklist §11 success branch)",
+  "input": "{ \"a\": \"x\\'}\" , \"b\": 2 }",
+  "expected": { "a": "x\"}", "b": 2 },
+  "expectMessage": "corrected 1 mismatched closing quote"
+}
