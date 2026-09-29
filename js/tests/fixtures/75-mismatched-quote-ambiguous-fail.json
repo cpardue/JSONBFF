@@ -1,0 +1,6 @@
+{
+  "name": "mismatched closing quote — \"ok' opened double, closed single; both one-char repairs parse, so no guess, precise failure (checklist §11)",
+  "input": "{\n  \"name\": \"orders-stuff\",\n  \"count\": 3,\n  \"items\": [\n    {\n      \"id\": 1,\n      \"status\": \"ok'\n    },\n    {\n      \"id\": 2,\n      \"status\": null\n    },\n    {\n      \"id\": 3,\n      \"status\": null\n    }\n  ]\n}",
+  "expectOk": false,
+  "expectMessage": "Mismatched quote at line 7, column 20"
+}
