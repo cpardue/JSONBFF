@@ -150,6 +150,21 @@
         junk after the value. Recursion depth is stack-bounded: a runaway
         document throws out of permissiveParse, fix() catches it and
         reports the fallback as failed — no hang, no guess (§5.3).
+      - Mismatched closing quote ("...') is detected BEFORE the pipeline
+        runs (checklist §11): the ' that closes what opened as " starts a
+        fake multi-line span in mapStrings that swallows structure; left
+        to the pipeline, pass 14 escapes its raw newlines and the grammar
+        passes force a parse around it — a green "success" with the
+        document's data swallowed into one string.
+        findMismatchedQuotes tests the two one-character repairs per
+        candidate (swap ' → " ; add " after ') against a strict
+        whole-text parse: exactly one parseable repair → applied
+        (quotefix change entry, normal flow continues); two or more →
+        both readings are valid JSON → precise clean failure naming the
+        character, its line/column and both values — no guess. A
+        legitimate multi-line string that merely contains an apostrophe
+        can never parse here and falls through to the normal pipeline
+        (fixture 77 pins it; §4.5 raw-newline escapes unaffected).
       - Failure report (checklist §8.2, carrying §1's ±20-char window):
         the message cites the FIRST strict error on the ORIGINAL input —
         coordinates must match what the user pasted, not a mangled
@@ -371,7 +386,9 @@
 
   /* ---------------- passes (§5.2, fixed order) ----------------
      Each pass: text → { text, changes: [{key, count}] }; a pass reports
-     only what it actually changed. */
+     on unchanged text as { text, changes: [] }. Passes must be monotone:
+     re-running a pass on its own output changes nothing (the pipeline
+     re-rounds until a full round is no-op or the text parses). */
 
   /** Pass 1 — Normalize: strip UTF-8 BOM, convert CRLF/CR → LF. */
   function passNormalize(text) {
@@ -792,7 +809,7 @@
   }
 
   /** Is the char at index i an escaped quote — odd number of consecutive
-      backslashes immediately before it? (\" is content; \\" is not.) */
+      backslashes immediately before it? (\" is content; \\\" is not.) */
   function escapesAt(text, i) {
     var n = 0;
     while (i - 1 - n >= 0 && text.charAt(i - 1 - n) === '\\') n++;
@@ -1391,7 +1408,6 @@
       err.pos = at == null ? p : at;
       throw err;
     }
-    function ch(i) { return i < n ? text.charAt(i) : ''; }
 
     /** Skip whitespace AND comments (comments are one of the four
         tolerated constructs — counted). An unterminated block comment runs
@@ -1623,6 +1639,7 @@
     keys: function (c) { return c === 1 ? 'quoted 1 key' : 'quoted ' + c + ' keys'; },
     trailing: function (c) { return c === 1 ? 'removed 1 trailing comma' : 'removed ' + c + ' trailing commas'; },
     leading: function (c) { return c === 1 ? 'removed 1 stray leading comma' : 'removed ' + c + ' stray leading commas'; },
+    quotefix: function (c) { return c === 1 ? 'corrected 1 mismatched closing quote' : 'corrected ' + c + ' mismatched closing quotes'; },
     jslit: function (c) { return c === 1 ? 'replaced 1 invalid literal' : 'replaced ' + c + ' invalid literals'; },
     pylit: function (c) { return c === 1 ? 'replaced 1 Python-style literal' : 'replaced ' + c + ' Python-style literals'; },
     number: function (c) { return c === 1 ? 'fixed 1 malformed number' : 'fixed ' + c + ' malformed numbers'; },
@@ -1656,6 +1673,53 @@
     return n;
   }
 
+  /** Mismatched-closing-quote scan (checklist §11), run on the ORIGINAL
+      failing text before any pass. For every double-quoted span, each '
+      that is followed (past whitespace) by , } ] or EOF is a candidate
+      closing quote; it yields two one-character repairs — swap it to "
+      (the value ends there) or add a " after it (the apostrophe is data
+      and its real closing quote is missing). Each repair is certified by
+      a strict parse of the WHOLE text, so a legitimate multi-line string
+      that merely contains an apostrophe can never be certified here and
+      falls through to the normal pipeline untouched (§4.5, fixture 50 /
+      77). fix() applies the repair when exactly one of all candidates
+      parses (unique, parser-certified) and fails precisely — no guess —
+      when two or more parse. Tests are capped (like pass 11) so a
+      pathological document costs O(cap) parses. */
+  var MAX_QUOTE_TESTS = 32;
+  function findMismatchedQuotes(text) {
+    var spans = mapStrings(text);
+    var n = text.length;
+    var parseable = []; // { pos, start, swapOk, insertOk }
+    var tests = 0;
+    for (var k = 0; k < spans.length; k++) {
+      var s = spans[k][0], e = spans[k][1];
+      if (text.charAt(s) !== '"') continue; // double-quoted opener only
+      for (var p = s + 1; p < e; p++) {
+        if (text.charAt(p) !== "'") continue;
+        var j = p + 1;
+        while (j < n && isWs(text.charAt(j))) j++;
+        if (j < n) {
+          var c = text.charAt(j);
+          if (c !== ',' && c !== '}' && c !== ']') continue;
+        }
+        if (tests >= MAX_QUOTE_TESTS) break;
+        tests += 2;
+        var swapOk = attemptParse(text.slice(0, p) + '"' + text.slice(p + 1)).ok;
+        var insertOk = attemptParse(text.slice(0, p + 1) + '"' + text.slice(p + 1)).ok;
+        if (swapOk || insertOk) parseable.push({ pos: p, start: s + 1, swapOk: swapOk, insertOk: insertOk });
+      }
+      if (tests >= MAX_QUOTE_TESTS) break;
+    }
+    return parseable;
+  }
+
+  /** Short one-line preview of a string reading for the §11 report. */
+  function quotePreview(text, from, to) {
+    var v = text.slice(from, to).replace(/[\n\r\t]/g, ' ');
+    return v.length > 24 ? v.slice(0, 24) + '…' : v;
+  }
+
   /** Fix (repair) per §4: repaired output formatted at `indent`; status
       lists what was fixed; idempotent on valid input (0 changes). */
   function fix(text, indent) {
@@ -1669,6 +1733,43 @@
     // pass-produced intermediate).
     var firstError = parsed.ok ? null : parsed.error;
     var changes = [];
+    /* §11 — mismatched closing quote ("...'): decided BEFORE any pass
+       runs, because the fake multi-line span this defect creates is
+       exactly what lets the pipeline "succeed" with data swallowed.
+       Exactly one parseable one-char repair → apply it and fall through
+       to the normal success flow; two or more (both readings are valid
+       JSON) → precise clean failure, no guess (§5.3). */
+    if (!parsed.ok) {
+      var mq = findMismatchedQuotes(text);
+      var mqOk = 0;
+      for (var q = 0; q < mq.length; q++) mqOk += (mq[q].swapOk ? 1 : 0) + (mq[q].insertOk ? 1 : 0);
+      if (mqOk === 1) {
+        var mqHit = null;
+        for (var q2 = 0; q2 < mq.length; q2++) {
+          if (mq[q2].swapOk || mq[q2].insertOk) { mqHit = mq[q2]; break; }
+        }
+        current = mqHit.swapOk
+          ? text.slice(0, mqHit.pos) + '"' + text.slice(mqHit.pos + 1)
+          : text.slice(0, mqHit.pos + 1) + '"' + text.slice(mqHit.pos + 1);
+        changes.push({ key: 'quotefix', count: 1 });
+        parsed = attemptParse(current); // certified ok by construction
+      } else if (mqOk > 1) {
+        var pcQ = lineColOf(text, mq[0].pos);
+        var sv = quotePreview(text, mq[0].start, mq[0].pos);
+        var iv = quotePreview(text, mq[0].start, mq[0].pos + 1);
+        return {
+          ok: false,
+          output: text,
+          message: '✗ Mismatched quote at line ' + pcQ.line + ', column ' + pcQ.col +
+                   ' — this string opens with " but is closed by \'. ' +
+                   (mqOk === 2 ? 'Two one-character repairs both give valid JSON' : mqOk + ' one-character repairs give valid JSON') +
+                   ': end the value there (\'' + sv + '\') or keep the apostrophe and add the missing closing quote (\'' + iv + '\'). ' +
+                   'I can\'t tell which value you meant, so I won\'t guess. Fix that one character, then re-run.' +
+                   '\n' + contextSnippet(text, { line: pcQ.line, col: pcQ.col, pos: mq[0].pos }),
+          changes: []
+        };
+      }
+    }
     // Rounds of the fixed-order passes. Passes are monotone, but cap the
     // rounds anyway: a logic bug must fail clean, never hang the tab.
     var MAX_ROUNDS = 10;
