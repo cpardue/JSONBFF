@@ -73,7 +73,7 @@
     if (!input.value.trim()) { setStatus('warn', 'Nothing to fix yet — paste JSON first.'); return; }
     if (!fixAvailable()) { setStatus('warn', 'Fix is unavailable — js/fixer.js did not load.'); return; }
     var r = window.JSONBFFFix.fix(input.value, currentIndent());
-    if (r && typeof r.output === 'string' && r.output) output.textContent = r.output; // best-effort kept visible
+    if (r.ok && typeof r.output === 'string' && r.output) output.textContent = r.output; // never clobber with garbage (same contract as doFormat)
     setStatus(r.ok ? 'ok' : 'error', r.message);
   }
 
