@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- JSON BFF — sitemap (JSONBFF-PLAN.md §7). Generated 2026-09-09 for the
-     production URL chris-pardue.com/JSONBFF/ (custom domain behind
-     Cloudflare; cpardue.github.io/JSONBFF/ 301-redirects here, §8). -->
+<!-- JSON BFF — sitemap (JSONBFF-PLAN.md §7). Generated 2026-09-09; URLs re-pointed 2026-10-12 to the production origin https://jsonbff.com (CNAME). -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://chris-pardue.com/JSONBFF/index.html</loc>
-    <lastmod>2026-09-09</lastmod>
+    <loc>https://jsonbff.com/index.html</loc>
+    <lastmod>2026-10-12</lastmod>
   </url>
   <url>
-    <loc>https://chris-pardue.com/JSONBFF/about.html</loc>
-    <lastmod>2026-09-09</lastmod>
+    <loc>https://jsonbff.com/about.html</loc>
+    <lastmod>2026-10-12</lastmod>
   </url>
   <url>
-    <loc>https://chris-pardue.com/JSONBFF/privacy.html</loc>
-    <lastmod>2026-09-09</lastmod>
+    <loc>https://jsonbff.com/privacy.html</loc>
+    <lastmod>2026-10-12</lastmod>
   </url>
 </urlset>
