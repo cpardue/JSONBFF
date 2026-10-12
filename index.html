@@ -70,20 +70,16 @@
   -->
 
   <!-- =====================================================================
-       WEBMCP origin trial (JSONBFF-PLAN.md §12) — fill in after deploy (§8).
-       The WebMCP API (document.modelContext) is in Chrome/Edge origin
-       trials; js/webmcp.js is a silent no-op without it, so the site works
-       everywhere either way. Post-deploy:
-       1. Join the WebMCP origin trial and request a token for this site's
-          ORIGIN — production origin is now https://chris-pardue.com
-          (custom domain live 2026-09-09; cpardue.github.io 301s there, so
-          browsers end up on the chris-pardue.com origin). Tokens expire
-          (~6 months) — re-request on renewal or any domain change.
-       2. Uncomment the meta tag below with the real token.
-       3. Verify the tools register (Model Context Tool Inspector extension,
-          or document.modelContext.getTools() in DevTools).
+       WEBMCP origin trial (JSONBFF-PLAN.md §12) — Chrome token live 2026-10-12.
+       The WebMCP API (document.modelContext) is in a Chrome/Edge origin
+       trial; js/webmcp.js is a silent no-op without the token, so the site
+       works everywhere either way. Production origin = https://jsonbff.com
+       (CNAME). Token below is origin-scoped to that domain, expiry
+       2027-03-30 — on renewal swap in the fresh token (one meta per token;
+       an Edge token would be added as a second meta). Verify: Model Context
+       Tool Inspector extension, or document.modelContext.getTools() in DevTools.
        ===================================================================== -->
-  <!-- <meta http-equiv="OriginTrial" content="REPLACE-WITH-ORIGIN-TRIAL-TOKEN" /> -->
+  <meta http-equiv="OriginTrial" content="AnEXHY9UOOX8v7TKkCR5u8QTBTG3c91fAxZitmD546zOTrdKk3M3grfMVb0aXrVUYAwljxCYv6HlVMZiEp7z9gUAAABLeyJvcmlnaW4iOiJodHRwczovL2pzb25iZmYuY29tOjQ0MyIsImZlYXR1cmUiOiJXZWJNQ1AiLCJleHBpcnkiOjE4MDYzNjQ4MDB9" />
 
   <!-- ANALYTICS (GA4) — same pattern as AdSense: add the gtag snippet and
        measurement ID (G-XXXXXXXXXX) after approval (JSONBFF-PLAN.md §9). -->
